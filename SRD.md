@@ -1,6 +1,6 @@
 # Giroflée — Software Requirements Document
 
-Status: **draft 0.3** · Language of this document: English · Language of the product: French (v0.1)
+Status: **draft 0.5** · Progress: see section 0.1 · Language of this document: English · Language of the product: French (v0.1)
 Audience: the author, and Claude (as the implementing agent). Technical notes are mixed in on purpose and marked **[TECH]**. Requirements are numbered so code, tests and commits can cite them (`FR-…`, `ARCH-…`, `PACK-…`, `LIC-…`).
 
 Keywords: MUST / SHOULD / MAY as in RFC 2119. Everything here has been decided by the author unless it appears in the pending list of section 18.
@@ -15,6 +15,15 @@ Keywords: MUST / SHOULD / MAY as in RFC 2119. Everything here has been decided b
 - **WA-4** No personal data of the author or of real clients in the repository, fixtures, tests, screenshots or examples. Use fictitious data.
 - **WA-5** If a requirement is ambiguous, ask. Do not fill the gap silently.
 - **WA-6** **Tests travel with the code.** Every feature lands with unit tests, and with an integration (scenario/replay) test when it involves user interaction; every fixed bug lands with a regression test (section 15.3). CI must stay green.
+- **WA-7** **Keep `CHANGELOG.md` up to date with every commit** (an entry under *Unreleased*), and keep the progress table (0.1) and the SRD itself in sync with what was built or decided.
+
+### 0.1 Progress
+
+| Milestone | Status |
+|---|---|
+| M0 Scaffold, CI, CLI skeleton, replay harness | **Done** (released as v0.1.1; the first real CI run, Windows export and release included, worked) |
+| M1 Core: model, commands, resolver, history, JSON save/load, CLI `run-script` | **Done** (section 19; 134 tests) |
+| M2 – M7 | Not started (M2 next) |
 
 ---
 
@@ -308,7 +317,7 @@ Low coupling. Every change to the document is a serializable **command**; one co
 - **ARCH-7** **Not in the Document and not commands:** selection, hover, viewport, active circuit, circuit focus (greyed/solo), open tab, tool state. These are per-user UI state. (The active tab and viewport MAY be persisted in an optional `ui` block of the file; the Resolver ignores it.)
 - **ARCH-8** **Derived data is never stored or transmitted as truth** (DRY): unifilaire rows, report, point counts, label proposals are recomputed from the Document (cached by `seq`). Only user overrides and acknowledgements are stored.
 - **ARCH-9** **Config is document state:** project settings (frame, grid, fonts, symbol scales…) change through commands, so they are undoable and syncable.
-- **ARCH-10** The command stream is the scripting API: any automation is a JSON list of commands. A **headless CLI mode** is **required** (it underpins unit and integration tests): `godot --headless -- giroflee-cli <subcommand>` with at least `run-script <commands.json> [--project <file>]` (apply commands, save result), `export-svg <project> <out>`, `derive-unifilaire <project>` (print the derived diagram as JSON) and `validate <project>` (print the report as JSON). Exit codes are non-zero on failure.
+- **ARCH-10** The command stream is the scripting API: any automation is a JSON list of commands. A **headless CLI mode** is **required** (it underpins unit and integration tests): `godot --headless -- giroflee-cli <subcommand>` with at least `run-script <commands.json> [--project <file>] [--out <file>] [--print]` (apply commands, save result; **implemented in M1**), `export-svg <project> <out>` (M6), `derive-unifilaire <project>` (M4, prints the derived diagram as JSON) and `validate <project>` (M5, prints the report as JSON). Exit codes are non-zero on failure.
 - **ARCH-11** Anchoring/stacks, groups, indices, numbering, quickbar presets, copy-settings and label placement are Core logic with unit tests, not UI code.
 
 ### 10.3 Rendering, one drawing pass **[TECH]**
@@ -449,7 +458,7 @@ Files (provided in this repo): `.github/workflows/ci.yml`, `.github/actions/setu
 - **CI-5** Godot and export templates are downloaded from the official `godot-builds` release for the pinned version. Linux export can be added later by adding an export preset.
 - **CI-6** The repo contains (since M0): `export_presets.cfg` with a preset named **"Windows Desktop"**, a `config/version` key in `project.godot`, GUT in `addons/gut/`, and tests under `tests/`.
 - **CI-7** Tests always run through `tools/run-tests.sh`, which fails the run if any test script fails to load. (GUT alone skips such a script silently and still reports success.)
-- **CI-8** The Windows export step has not been run yet (export templates for 4.7.2 are not installed on the author's machine); the first CI run on `main` is its first real test.
+- **CI-8** Verified by the first real run (v0.1.1): tests, Windows export, packaging and GitHub release all work. Workflow files must be called through `bash` (a Windows-committed script has no executable bit).
 
 ## 17. Suggested implementation order
 
@@ -472,3 +481,46 @@ Every milestone is done only when its tests (WA-6, section 15.3) pass in CI.
 1. **Rule values:** the author fills in `packs/belgium/rules.template.json` later. Until then every rule reports "règle non configurée". Catalogue extras (e.g. the 25 A breaker the author owns) are added on need.
 2. **Quickbar:** how a slot is filled (e.g. pick up with the pipette, then assign) and whether the quickbar belongs to the project or to the user.
 3. **Keys or gestures** for: anchoring (FR-STACK-2), copy/paste settings (FR-EDIT-7). They exist only as palette commands for now.
+
+## 19. Implementation notes (kept in sync with the code)
+
+### 19.1 M1: Core as built
+
+**Model.** `Document` (project) → `Sheet` (`plan` | `unifilaire`) → `Entity` (`wall`, `opening`, `stair`, `grey_block`, `text`, `symbol`). Entities are `id + type + props`, where `props` is a JSON-shaped dictionary validated and normalised by `Schema` (property kinds: `int`, `float`, `string`, `bool`, `vec2i`, `points`, `string_array`, `enum:a|b`). Entity ids are unique document-wide; only plan sheets hold entities. A symbol's `index` of **0 means "no index assigned yet"**. The `cartouche`, `board` and `circuits` sections are free dictionaries until M3/M4 give them schemas; `config` has a schema (font family, base font size, default wall weight, provisoire mark).
+
+**Commands** (`CommandRegistry`; payloads are JSON primitives, all ids client-generated):
+
+| Type | Payload |
+|---|---|
+| `sheet.add` | `id, kind, props{name,…}, index?` |
+| `sheet.update` | `id, props{partial}` (kind is immutable; ghost references are checked) |
+| `sheet.remove` | `id` (also removes its entities and its references in other sheets' ghost lists) |
+| `sheet.move` | `id, index` (tab order) |
+| `entity.add` | `sheet, items[{id,type,props}]` (all-or-nothing) |
+| `entity.update` | `sheet, items[{id,props{partial}}]` |
+| `entity.remove` | `sheet, ids[]` |
+| `entity.move` | `sheet, ids[], delta[dx,dy]` (integer mm, y up) |
+| `doc.set` / `doc.unset` | `section, key, value` (`config` is schema-checked and cannot be unset) |
+| `patch.apply` | `ops[]` (how undo and redo travel; ARCH-5) |
+
+**Patches.** A handler is a pure function `(document, payload) → BuildResult` producing primitive operations (`entity`, `sheet`, `sheet_order`, `value`), each with its `before` and `after` state. `PatchApplier` is the only code that mutates a document: it checks every `before` (a stale undo or a conflicting edit is refused), applies atomically and rolls back on failure. The inverse of a patch is mechanical (reverse order, swap before/after).
+
+**Resolver and channel.** `Resolver.submit()` rejects unknown types and re-used command ids, applies, numbers (`seq`) and emits `committed(patch)`. `CommandChannel` is the interface; `InProcessChannel` is the v0.1 implementation.
+
+**Session and history.** `Session` (one user's client) owns an `IdGenerator`, a channel and a `History`. `run([commands])` is one undo step (one transaction id) and rolls back if a later command fails; `undo()`/`redo()` send `patch.apply` commands through the channel. No-op commands (empty patches) are accepted but not recorded. Selection, viewport, active circuit and circuit focus are not part of the Session's document state (ARCH-7).
+
+**File.** `DocumentIO` + `JsonWriter` produce `*.giroflee`: sorted keys, two-space indent, scalar arrays such as `[x, y]` on one line, floats lossless, entities sorted by id, sheets in tab order, trailing newline. Loading is **strict**: unknown keys, unknown properties, bad values, duplicate ids, entities on a non-plan sheet and dangling ghost references are errors (nothing is silently dropped). `format_version` is 1; `Migrations` upgrades older files step by step and refuses newer ones.
+
+**CLI.** `run-script <script.json> [--project <file>] [--out <file>] [--print]` applies a script (`{"format_version":1,"commands":[…]}`) through the same resolver as the GUI. Commands without an id get `script-<n>`.
+
+### 19.2 Tests added with M1 (TEST-1, TEST-2)
+- Unit tests for schema, migrations, id generator, JSON writer, document I/O, each command family, patches/applier, resolver, session/history, CLI.
+- **Scenario + golden:** `tests/scenarios/basic_floor.json` run through the CLI must reproduce `tests/golden/basic_floor.giroflee` byte for byte; every golden file must reload and re-save unchanged. Regenerate with `tools/regen-golden.sh`, then review the diff.
+- **Property tests:** seeded random command sequences (8 seeds × 80 steps) must (a) keep the document consistent after every step, (b) undo back through every intermediate state byte for byte and redo forward again, (c) be deterministic, (d) round-trip through save/load at every state.
+- `tests/unit/test_scripts_load.gd` fails if any script under `src/` does not parse under the strict typing rules.
+
+### 19.3 Conventions learned the hard way
+- Strict typing rejects `int()`, `bool()`, `float()` applied to a `Variant`; read values into typed locals instead (see `JsonUtil`).
+- Test scripts may use `@warning_ignore_start("unsafe_call_argument")`: GUT's `assert_*` functions take untyped arguments, and passing a dictionary lookup to them is otherwise an error.
+- After adding a script with a new `class_name`, refresh the class cache with `godot --headless --path . --import` (`tools/run-tests.sh` and `tools/regen-golden.sh` do it).
+- Files in `tests/` whose name starts with `test_` are collected by GUT; helpers use another prefix (`tests/support/kit_helpers.gd`).

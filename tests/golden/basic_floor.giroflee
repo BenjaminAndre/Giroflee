@@ -1,0 +1,194 @@
+{
+  "board": {},
+  "cartouche": {
+    "address": "Rue de l'Exemple 1, 5000 Namur",
+    "owner": "Jeanne Exemple"
+  },
+  "circuits": {},
+  "config": {
+    "font_family": "Atkinson Hyperlegible",
+    "font_size_pt": 11.0,
+    "provisoire_mark": true,
+    "wall_weight_mm": 1.4
+  },
+  "format_version": 1,
+  "pack_ref": "belgium",
+  "sheets": [
+    {
+      "entities": [
+        {
+          "id": "rez-door-1",
+          "props": {
+            "flip_h": false,
+            "flip_v": false,
+            "hinge": "left",
+            "host_offset_mm": 0,
+            "host_wall": "",
+            "kind": "door",
+            "pos": [3000, 0],
+            "rotation": 0.0,
+            "width_mm": 900
+          },
+          "type": "opening"
+        },
+        {
+          "id": "rez-lamp-1",
+          "props": {
+            "anchor_offset": [0, 0],
+            "anchor_parent": "",
+            "circuit": "A",
+            "count": 1,
+            "count_offset": [0, 0],
+            "flip_h": false,
+            "flip_v": false,
+            "height_mm": -1,
+            "index": 1,
+            "label_offset": [0, 0],
+            "label_pinned": false,
+            "pos": [2250, 2400],
+            "rotation": 0.0,
+            "symbol_type": "lamp"
+          },
+          "type": "symbol"
+        },
+        {
+          "id": "rez-room-1",
+          "props": {
+            "font": "",
+            "pos": [2000, 3000],
+            "role": "room",
+            "rotation": 0.0,
+            "size_pt": 14.0,
+            "text": "Salle de séjour"
+          },
+          "type": "text"
+        },
+        {
+          "id": "rez-socket-1",
+          "props": {
+            "anchor_offset": [0, 0],
+            "anchor_parent": "",
+            "circuit": "B",
+            "count": 3,
+            "count_offset": [0, 0],
+            "flip_h": false,
+            "flip_v": false,
+            "height_mm": -1,
+            "index": 1,
+            "label_offset": [0, 0],
+            "label_pinned": false,
+            "pos": [100, 3000],
+            "rotation": 90.0,
+            "symbol_type": "socket"
+          },
+          "type": "symbol"
+        },
+        {
+          "id": "rez-stair-1",
+          "props": {
+            "flip_h": false,
+            "flip_v": false,
+            "pos": [6000, 4000],
+            "rotation": 0.0,
+            "steps": 12,
+            "tread_mm": 250,
+            "width_mm": 900
+          },
+          "type": "stair"
+        },
+        {
+          "id": "rez-switch-1",
+          "props": {
+            "anchor_offset": [0, 0],
+            "anchor_parent": "",
+            "circuit": "A",
+            "count": 1,
+            "count_offset": [0, 0],
+            "flip_h": false,
+            "flip_v": false,
+            "height_mm": -1,
+            "index": 1,
+            "label_offset": [0, 0],
+            "label_pinned": false,
+            "pos": [750, 0],
+            "rotation": 0.0,
+            "symbol_type": "switch"
+          },
+          "type": "symbol"
+        },
+        {
+          "id": "rez-wall-1",
+          "props": {
+            "points": [
+              [0, 0],
+              [8000, 0],
+              [8000, 6000],
+              [0, 6000],
+              [0, 0]
+            ],
+            "weight_mm": 1.4
+          },
+          "type": "wall"
+        }
+      ],
+      "id": "sheet-rez",
+      "kind": "plan",
+      "props": {
+        "frame_cols": 17,
+        "frame_rows": 8,
+        "ghost_on": false,
+        "ghost_sheets": [],
+        "grid_step_mm": 100,
+        "hints": true,
+        "name": "Rez",
+        "paper_h_mm": 297,
+        "paper_w_mm": 420,
+        "scale_den": 50
+      }
+    },
+    {
+      "entities": [
+        {
+          "id": "etage-block-1",
+          "props": {
+            "pos": [1000, 1000],
+            "rotation": 0.0,
+            "size": [2000, 900]
+          },
+          "type": "grey_block"
+        }
+      ],
+      "id": "sheet-etage",
+      "kind": "plan",
+      "props": {
+        "frame_cols": 0,
+        "frame_rows": 8,
+        "ghost_on": true,
+        "ghost_sheets": ["sheet-rez"],
+        "grid_step_mm": 100,
+        "hints": true,
+        "name": "Étage",
+        "paper_h_mm": 297,
+        "paper_w_mm": 420,
+        "scale_den": 50
+      }
+    },
+    {
+      "entities": [],
+      "id": "sheet-cave",
+      "kind": "plan",
+      "props": {
+        "frame_cols": 17,
+        "frame_rows": 8,
+        "ghost_on": false,
+        "ghost_sheets": [],
+        "grid_step_mm": 100,
+        "hints": true,
+        "name": "Cave",
+        "paper_h_mm": 297,
+        "paper_w_mm": 420,
+        "scale_den": 50
+      }
+    }
+  ]
+}

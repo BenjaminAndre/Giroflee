@@ -5,6 +5,7 @@ Read [SRD.md](SRD.md) first; it is the source of truth. Working agreements are i
 - **Never pick a key or mouse mapping without asking the author.** Only the table in SRD section 7 is approved.
 - No personal data in the repo, fixtures or tests. Keep it lean; add things on need.
 - Tests travel with the code. Every feature gets unit tests, and a replay test if it involves interaction.
+- **Keep `CHANGELOG.md` up to date with every commit** (entry under *Unreleased*), and keep the SRD progress table (section 0.1) in sync.
 
 ## Commands
 
@@ -20,6 +21,8 @@ Always use `tools/run-tests.sh`, not bare GUT: GUT silently skips a test script 
 - GDScript only, **static typing everywhere**. Untyped declarations and unsafe property/method/cast/call-argument accesses are project **errors**.
   - `int(x)`, `bool(x)`, `float(x)` on a `Variant` are rejected. Assign to a typed variable instead (`var n: float = d.get("k", 0.0)`), or use a typed helper.
   - Loop over untyped arrays with `for item: Variant in arr`.
+- Tests: GUT asserts take untyped arguments, so test scripts that pass dictionary lookups to them start with `@warning_ignore_start("unsafe_call_argument")`. Helpers in `tests/support/` must not start with `test_` (GUT would collect them). After adding a `class_name`, run `godot --headless --path . --import` (the tool scripts do).
+- Golden files: after a deliberate change to the file format or to a scenario, run `tools/regen-golden.sh` and review the diff.
 - Core (`src/core/`) is pure `RefCounted`, no `Node`, headless-testable. UI never mutates the document directly (SRD ARCH-2).
 - Tabs for indentation in `.gd` files. French for user-facing strings (via `tr()`), English for code and comments.
 - Layout: `src/core` model and logic, `src/cli` headless CLI, `src/ui` scenes, `packs/` data (CC0), `tests/unit`, `tests/integration`, `tests/replays`, `tests/support`.

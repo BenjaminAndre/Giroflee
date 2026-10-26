@@ -19,6 +19,7 @@ func test_help_lists_every_planned_subcommand() -> void:
 	var cli: Cli = Cli.new()
 	assert_eq(cli.run(PackedStringArray(["help"])), Cli.EXIT_OK)
 	var text: String = "\n".join(cli.output)
+	assert_string_contains(text, "run-script")
 	for name: String in Cli.PLANNED.keys():
 		assert_string_contains(text, name)
 
@@ -31,7 +32,7 @@ func test_unknown_subcommand_is_a_usage_error() -> void:
 
 func test_planned_subcommands_fail_loudly_until_implemented() -> void:
 	var cli: Cli = Cli.new()
-	assert_eq(cli.run(PackedStringArray(["run-script"])), Cli.EXIT_USAGE)
+	assert_eq(cli.run(PackedStringArray(["export-svg"])), Cli.EXIT_USAGE)
 	assert_string_contains(cli.output[0], "not implemented")
 
 

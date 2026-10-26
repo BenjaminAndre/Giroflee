@@ -1,0 +1,31 @@
+{
+  "format_version": 1,
+  "commands": [
+    { "type": "doc.set", "payload": { "section": "cartouche", "key": "address", "value": "Rue de l'Exemple 1, 5000 Namur" } },
+    { "type": "doc.set", "payload": { "section": "cartouche", "key": "owner", "value": "Jeanne Exemple" } },
+    { "type": "doc.set", "payload": { "section": "config", "key": "font_size_pt", "value": 11 } },
+    { "type": "sheet.add", "payload": { "id": "sheet-rez", "kind": "plan", "props": { "name": "Rez" } } },
+    { "type": "sheet.add", "payload": { "id": "sheet-etage", "kind": "plan", "props": { "name": "Étage", "ghost_on": true, "ghost_sheets": ["sheet-rez"] } } },
+    { "type": "sheet.add", "payload": { "id": "sheet-cave", "kind": "plan", "props": { "name": "Cave" }, "index": 0 } },
+    { "type": "entity.add", "payload": { "sheet": "sheet-rez", "items": [
+      { "id": "rez-wall-1", "type": "wall", "props": { "points": [[0, 0], [8000, 0], [8000, 6000], [0, 6000], [0, 0]] } },
+      { "id": "rez-door-1", "type": "opening", "props": { "kind": "door", "pos": [3000, 0], "width_mm": 900 } },
+      { "id": "rez-window-1", "type": "opening", "props": { "kind": "window", "pos": [8000, 3000], "width_mm": 1200, "rotation": 90 } },
+      { "id": "rez-stair-1", "type": "stair", "props": { "pos": [6000, 4000], "width_mm": 900, "steps": 12, "tread_mm": 250 } },
+      { "id": "rez-room-1", "type": "text", "props": { "pos": [2000, 3000], "text": "Salon", "role": "room" } }
+    ] } },
+    { "type": "entity.add", "payload": { "sheet": "sheet-rez", "items": [
+      { "id": "rez-lamp-1", "type": "symbol", "props": { "symbol_type": "lamp", "pos": [2000, 2500], "circuit": "A", "index": 1 } },
+      { "id": "rez-switch-1", "type": "symbol", "props": { "symbol_type": "switch", "pos": [500, 100], "circuit": "A", "index": 1 } },
+      { "id": "rez-socket-1", "type": "symbol", "props": { "symbol_type": "socket", "pos": [100, 3000], "circuit": "B", "index": 1, "count": 3, "rotation": 90 } }
+    ] } },
+    { "type": "entity.add", "payload": { "sheet": "sheet-etage", "items": [
+      { "id": "etage-block-1", "type": "grey_block", "props": { "pos": [1000, 1000], "size": [2000, 900] } }
+    ] } },
+    { "type": "entity.move", "payload": { "sheet": "sheet-rez", "ids": ["rez-lamp-1", "rez-switch-1"], "delta": [250, -100] } },
+    { "type": "entity.update", "payload": { "sheet": "sheet-rez", "items": [ { "id": "rez-room-1", "props": { "text": "Salle de séjour", "size_pt": 14 } } ] } },
+    { "type": "entity.remove", "payload": { "sheet": "sheet-rez", "ids": ["rez-window-1"] } },
+    { "type": "sheet.move", "payload": { "id": "sheet-cave", "index": 2 } },
+    { "type": "sheet.update", "payload": { "id": "sheet-etage", "props": { "frame_cols": 0 } } }
+  ]
+}

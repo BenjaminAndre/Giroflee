@@ -2,7 +2,7 @@
 
 Lean desktop tool to draw **domestic electrical plans** (plan de position + schéma unifilaire), built with Godot. First country pack: Belgium (RGIE). See [SRD.md](SRD.md) for the full requirements.
 
-Status: milestone M0 (scaffold). Nothing drawable yet.
+Status: milestone M1 done (core model, commands, undo/redo, project file, CLI). Nothing drawable yet (M2 next).
 
 ## Build and test
 
@@ -11,6 +11,8 @@ Requires **Godot 4.7.2** (pinned).
 ```bash
 GODOT=/path/to/godot tools/run-tests.sh                 # whole test suite, headless
 godot --headless --path . -- giroflee-cli version       # headless CLI
+godot --headless --path . -- giroflee-cli run-script tests/scenarios/basic_floor.json --print
+GODOT=/path/to/godot tools/regen-golden.sh              # regenerate golden files after a deliberate change
 ```
 
 ## Licence
