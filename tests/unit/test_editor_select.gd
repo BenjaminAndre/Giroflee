@@ -123,23 +123,6 @@ func test_closed_wall_corner_handle_keeps_the_loop_closed() -> void:
 	assert_eq(points[4], [1000, 1000], "first and last still coincide")
 
 
-func test_grey_block_corner_handle_resizes_it() -> void:
-	var b: String = kit.add("grey_block", {"pos": [3000, 3000], "size": [1000, 1000]})
-	kit.model.set_selection([b])
-	kit.drag(Vector2(4000, 4000), Vector2(5000, 4500))
-	assert_eq(kit.doc().find_entity(b).props["pos"], [3000, 3000], "opposite corner stays")
-	assert_eq(kit.doc().find_entity(b).props["size"], [2000, 1500])
-	kit.drag(Vector2(3000, 3000), Vector2(2000, 2000))
-	assert_eq(kit.doc().find_entity(b).props["pos"], [2000, 2000])
-	assert_eq(kit.doc().find_entity(b).props["size"], [3000, 2500])
-
-
-func test_block_handles_are_hidden_when_it_is_rotated() -> void:
-	var b: String = kit.add("grey_block", {"pos": [3000, 3000], "size": [1000, 1000], "rotation": 90})
-	kit.model.set_selection([b])
-	assert_eq(SelectTool.handles_for(kit.model).size(), 0)
-
-
 func test_double_click_on_a_text_asks_for_the_inline_editor() -> void:
 	var t: String = kit.add("text", {"pos": [3000, 3000], "text": "Salon"})
 	watch_signals(kit.model)

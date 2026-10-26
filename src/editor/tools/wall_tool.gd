@@ -71,13 +71,13 @@ func preview(model: EditorModel) -> DrawList:
 	var context: RenderContext = model.ctx()
 	var weight_page: float = model.doc().config["wall_weight_mm"]
 	var weight: float = context.page_to_world(weight_page)
+	# exactly what the finished wall will look like (SRD FR-PREV-1)
 	for polygon: PackedVector2Array in EntityGeometry.wall_polygons(path, weight):
-		var op: DrawOp = DrawOp.polygon(polygon, Color(0.05, 0.47, 0.95, 0.55), "preview")
-		list.add(op)
+		list.add(DrawOp.polygon(polygon, PlanTheme.BLACK, "walls"))
 	var a: Vector2 = EntityGeometry.vec(path[path.size() - 2])
 	var b: Vector2 = EntityGeometry.vec(path[path.size() - 1])
 	var size: float = 13.0 / model.view().zoom
-	var readout: DrawOp = DrawOp.label(Fmt.length(a.distance_to(b)), (a + b) * 0.5 + Vector2(0.0, size * 0.8), size, PlanTheme.BLUE, "preview")
+	var readout: DrawOp = DrawOp.label(Fmt.length(a.distance_to(b)), (a + b) * 0.5 + Vector2(0.0, size * 0.8), size, PlanTheme.PREVIEW_TEXT, "preview")
 	readout.anchor = "center"
 	list.add(readout)
 	return list

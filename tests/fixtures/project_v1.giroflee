@@ -1,0 +1,62 @@
+{
+  "board": {},
+  "cartouche": {
+    "owner": "Jeanne Exemple"
+  },
+  "circuits": {},
+  "config": {
+    "font_family": "Atkinson Hyperlegible",
+    "font_size_pt": 10.0,
+    "provisoire_mark": true,
+    "wall_weight_mm": 1.4
+  },
+  "format_version": 1,
+  "pack_ref": "belgium",
+  "sheets": [
+    {
+      "entities": [
+        {
+          "id": "w1",
+          "props": {
+            "points": [[0, 0], [4000, 0]],
+            "weight_mm": 1.4
+          },
+          "type": "wall"
+        }
+      ],
+      "id": "sheet-a",
+      "kind": "plan",
+      "props": {
+        "frame_cols": 12,
+        "frame_rows": 5,
+        "ghost_on": true,
+        "ghost_sheets": [],
+        "grid_step_mm": 100,
+        "hints": false,
+        "name": "Rez",
+        "paper_h_mm": 297,
+        "paper_w_mm": 420,
+        "scale_den": 50,
+        "title_pos_mm": [300, 30]
+      }
+    },
+    {
+      "entities": [],
+      "id": "sheet-b",
+      "kind": "plan",
+      "props": {
+        "frame_cols": 3,
+        "frame_rows": 3,
+        "ghost_on": false,
+        "ghost_sheets": ["sheet-a"],
+        "grid_step_mm": 100,
+        "hints": true,
+        "name": "Étage",
+        "paper_h_mm": 297,
+        "paper_w_mm": 420,
+        "scale_den": 50,
+        "title_pos_mm": [100, 10]
+      }
+    }
+  ]
+}

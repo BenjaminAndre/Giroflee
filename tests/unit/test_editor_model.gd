@@ -23,11 +23,11 @@ func test_a_new_project_starts_with_one_empty_etage() -> void:
 
 
 func test_new_sheet_inherits_settings_gets_a_free_name_and_becomes_active() -> void:
-	kit.model.set_sheet_props({"scale_den": 100, "frame_cols": 12})
+	kit.model.set_sheet_props({"scale_den": 100, "grid_step_mm": 250})
 	kit.model.new_sheet()
 	assert_eq(_names(), ["Rez", "Étage"])
 	assert_eq(kit.sheet().props["scale_den"], 100)
-	assert_eq(kit.sheet().props["frame_cols"], 12)
+	assert_eq(kit.sheet().props["grid_step_mm"], 250)
 	assert_eq(kit.sheet().display_name(), "Étage")
 	kit.model.new_sheet()
 	assert_eq(kit.sheet().display_name(), "Étage 2", "names stay unique")
@@ -143,19 +143,19 @@ func test_selection_does_not_follow_to_another_etage() -> void:
 func test_ghost_toggle_defaults_to_the_etage_below() -> void:
 	kit.model.new_sheet()
 	var below: String = kit.doc().sheet_order[0]
-	assert_false(kit.sheet().props["ghost_on"], "off by default (FR-PLAN-7)")
+	assert_false(kit.doc().config["ghost_on"], "off by default (FR-PLAN-7)")
 	kit.model.toggle_ghost()
-	assert_true(kit.sheet().props["ghost_on"])
+	assert_true(kit.doc().config["ghost_on"])
 	assert_eq(kit.sheet().props["ghost_sheets"], [below])
 	kit.model.toggle_ghost()
-	assert_false(kit.sheet().props["ghost_on"])
+	assert_false(kit.doc().config["ghost_on"])
 	assert_eq(kit.sheet().props["ghost_sheets"], [below], "the chosen étage is remembered")
 
 
 func test_hints_toggle() -> void:
-	assert_true(kit.sheet().props["hints"])
+	assert_true(kit.doc().config["hints"])
 	kit.model.toggle_hints()
-	assert_false(kit.sheet().props["hints"])
+	assert_false(kit.doc().config["hints"])
 
 
 # --- clipboard / duplicate / rotate / flip ----------------------------------------------------

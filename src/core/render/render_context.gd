@@ -7,6 +7,12 @@ var scale: float = 50.0
 var font_size_pt: float = 10.0
 ## Default wall line weight, in page mm.
 var wall_weight: float = 1.4
+## Project-wide display settings (SRD FR-PROJ-1).
+var frame_cols: int = 17
+var frame_rows: int = 8
+var title_pos_mm: Vector2 = Vector2(366, 34)
+var ghost_on: bool = false
+var hints: bool = true
 
 
 static func for_sheet(doc: Document, sheet: Sheet) -> RenderContext:
@@ -17,6 +23,11 @@ static func for_sheet(doc: Document, sheet: Sheet) -> RenderContext:
 	ctx.font_size_pt = size
 	var weight: float = doc.config["wall_weight_mm"]
 	ctx.wall_weight = weight
+	ctx.frame_cols = doc.config["frame_cols"]
+	ctx.frame_rows = doc.config["frame_rows"]
+	ctx.title_pos_mm = EntityGeometry.vec(doc.config["title_pos_mm"])
+	ctx.ghost_on = doc.config["ghost_on"]
+	ctx.hints = doc.config["hints"]
 	return ctx
 
 

@@ -5,7 +5,7 @@
     { "type": "doc.set", "payload": { "section": "cartouche", "key": "owner", "value": "Jeanne Exemple" } },
     { "type": "doc.set", "payload": { "section": "config", "key": "font_size_pt", "value": 11 } },
     { "type": "sheet.add", "payload": { "id": "sheet-rez", "kind": "plan", "props": { "name": "Rez" } } },
-    { "type": "sheet.add", "payload": { "id": "sheet-etage", "kind": "plan", "props": { "name": "Étage", "ghost_on": true, "ghost_sheets": ["sheet-rez"] } } },
+    { "type": "sheet.add", "payload": { "id": "sheet-etage", "kind": "plan", "props": { "name": "Étage", "ghost_sheets": ["sheet-rez"] } } },
     { "type": "sheet.add", "payload": { "id": "sheet-cave", "kind": "plan", "props": { "name": "Cave" }, "index": 0 } },
     { "type": "entity.add", "payload": { "sheet": "sheet-rez", "items": [
       { "id": "rez-wall-1", "type": "wall", "props": { "points": [[0, 0], [8000, 0], [8000, 6000], [0, 6000], [0, 0]] } },
@@ -26,6 +26,7 @@
     { "type": "entity.update", "payload": { "sheet": "sheet-rez", "items": [ { "id": "rez-room-1", "props": { "text": "Salle de séjour", "size_pt": 14 } } ] } },
     { "type": "entity.remove", "payload": { "sheet": "sheet-rez", "ids": ["rez-window-1"] } },
     { "type": "sheet.move", "payload": { "id": "sheet-cave", "index": 2 } },
-    { "type": "sheet.update", "payload": { "id": "sheet-etage", "props": { "frame_cols": 0 } } }
+    { "type": "doc.set", "payload": { "section": "config", "key": "frame_cols", "value": 0 } },
+    { "type": "doc.set", "payload": { "section": "config", "key": "ghost_on", "value": true } }
   ]
 }

@@ -8,10 +8,15 @@
   "config": {
     "font_family": "Atkinson Hyperlegible",
     "font_size_pt": 11.0,
+    "frame_cols": 0,
+    "frame_rows": 8,
+    "ghost_on": true,
+    "hints": true,
     "provisoire_mark": true,
+    "title_pos_mm": [366, 34],
     "wall_weight_mm": 1.4
   },
-  "format_version": 1,
+  "format_version": 2,
   "pack_ref": "belgium",
   "sheets": [
     {
@@ -133,17 +138,12 @@
       "id": "sheet-rez",
       "kind": "plan",
       "props": {
-        "frame_cols": 17,
-        "frame_rows": 8,
-        "ghost_on": false,
         "ghost_sheets": [],
         "grid_step_mm": 100,
-        "hints": true,
         "name": "Rez",
         "paper_h_mm": 297,
         "paper_w_mm": 420,
-        "scale_den": 50,
-        "title_pos_mm": [366, 34]
+        "scale_den": 50
       }
     },
     {
@@ -161,17 +161,12 @@
       "id": "sheet-etage",
       "kind": "plan",
       "props": {
-        "frame_cols": 0,
-        "frame_rows": 8,
-        "ghost_on": true,
         "ghost_sheets": ["sheet-rez"],
         "grid_step_mm": 100,
-        "hints": true,
         "name": "Étage",
         "paper_h_mm": 297,
         "paper_w_mm": 420,
-        "scale_den": 50,
-        "title_pos_mm": [366, 34]
+        "scale_den": 50
       }
     },
     {
@@ -179,17 +174,12 @@
       "id": "sheet-cave",
       "kind": "plan",
       "props": {
-        "frame_cols": 17,
-        "frame_rows": 8,
-        "ghost_on": false,
         "ghost_sheets": [],
         "grid_step_mm": 100,
-        "hints": true,
         "name": "Cave",
         "paper_h_mm": 297,
         "paper_w_mm": 420,
-        "scale_den": 50,
-        "title_pos_mm": [366, 34]
+        "scale_den": 50
       }
     }
   ]

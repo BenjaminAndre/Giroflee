@@ -2,7 +2,7 @@ class_name Document
 extends RefCounted
 ## The project: the single source of truth. Mutated only through PatchApplier (ARCH-2).
 
-const CURRENT_FORMAT_VERSION: int = 1
+const CURRENT_FORMAT_VERSION: int = 2
 const VALUE_SECTIONS: PackedStringArray = ["config", "cartouche", "board", "circuits"]
 
 var pack_ref: String = "belgium"

@@ -64,7 +64,7 @@ func _random_step(s: Session, rng: RandomNumberGenerator) -> bool:
 			var ghosts: Array = []
 			if not others.is_empty():
 				ghosts.append(others[rng.randi_range(0, others.size() - 1)])
-			return s.run_one("sheet.update", {"id": sheet_id, "props": {"ghost_on": not ghosts.is_empty(), "ghost_sheets": ghosts, "name": "R%d" % rng.randi_range(0, 9)}}).ok
+			return s.run_one("sheet.update", {"id": sheet_id, "props": {"ghost_sheets": ghosts, "name": "R%d" % rng.randi_range(0, 9)}}).ok
 	return false
 
 

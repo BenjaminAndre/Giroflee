@@ -8,8 +8,8 @@ extends RefCounted
 const TYPE_ORDER: Array[String] = ["grey_block", "stair", "opening", "wall", "text"]
 
 
-## Options: {"ghost": bool} overrides whether the sheet's ghost view is drawn (default: the
-## sheet's own `ghost_on`); {"frame": bool} (default true) draws the border frame;
+## Options: {"ghost": bool} overrides whether the ghost view is drawn (default: the project's
+## `ghost_on`); {"frame": bool} (default true) draws the border frame;
 ## {"overrides": {entity_id: props}} draws those entities with other properties (live previews
 ## of drags and resizes, before any command is committed).
 static func build(doc: Document, sheet_id: String, options: Dictionary = {}) -> DrawList:
@@ -19,7 +19,7 @@ static func build(doc: Document, sheet_id: String, options: Dictionary = {}) -> 
 		return list
 	var ctx: RenderContext = RenderContext.for_sheet(doc, sheet)
 
-	var show_ghost: bool = sheet.props["ghost_on"]
+	var show_ghost: bool = ctx.ghost_on
 	if options.has("ghost"):
 		show_ghost = options["ghost"]
 	if show_ghost and sheet.kind == "plan":
@@ -60,11 +60,10 @@ static func _add_title(sheet: Sheet, ctx: RenderContext, out: DrawList) -> void:
 	var name: String = sheet.display_name()
 	if name.is_empty():
 		return
-	var pos_mm: Array = sheet.props["title_pos_mm"]
-	var px: int = pos_mm[0]
-	var py: int = pos_mm[1]
+	var px: float = ctx.title_pos_mm.x
+	var py: float = ctx.title_pos_mm.y
 	var size: float = ctx.pt_to_world(ctx.font_size_pt * PlanTheme.role_factor("floor"))
-	var op: DrawOp = DrawOp.label(name, FrameBuilder.page_to_world(sheet, float(px), float(py)), size, PlanTheme.DARK_RED, "floor_title")
+	var op: DrawOp = DrawOp.label(name, FrameBuilder.page_to_world(sheet, px, py), size, PlanTheme.DARK_RED, "floor_title")
 	op.anchor = "center"
 	op.bold = true
 	out.add(op)

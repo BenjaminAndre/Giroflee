@@ -3,6 +3,8 @@ name: ci
 on:
   push:
     branches: [main]
+    # a version tag pushed by hand (e.g. v0.2.0) builds and publishes that exact version
+    tags: ["v*"]
   pull_request:
 
 permissions:
@@ -30,8 +32,8 @@ jobs:
     needs: test
     if: >-
       github.event_name == 'push' &&
-      github.ref == 'refs/heads/main' &&
-      !contains(github.event.head_commit.message, '[skip release]')
+      (github.ref_type == 'tag' ||
+       (github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[skip release]')))
     runs-on: ubuntu-latest
     # one release at a time, so two quick pushes never compute the same patch number
     concurrency:
@@ -47,21 +49,32 @@ jobs:
           version: ${{ env.GODOT_VERSION }}
           templates: "true"
 
-      - name: Compute version (MAJOR.MINOR from VERSION, PATCH auto-bumped)
+      # On main: MAJOR.MINOR come from VERSION and PATCH is bumped automatically.
+      # On a hand-pushed tag: the version is the tag itself.
+      - name: Compute version
         id: version
         run: |
           set -euo pipefail
-          base="$(tr -d '[:space:]' < VERSION)"
-          if ! [[ "$base" =~ ^[0-9]+\.[0-9]+$ ]]; then
-            echo "VERSION must contain MAJOR.MINOR (e.g. 0.1), got '$base'" >&2
-            exit 1
-          fi
           git fetch --tags --force
-          last="$(git tag --list "v${base}.*" | sed "s/^v${base}\.//" | grep -E '^[0-9]+$' | sort -n | tail -1 || true)"
-          patch=$(( ${last:-0} + 1 ))
-          version="${base}.${patch}"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            version="${GITHUB_REF_NAME#v}"
+            if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "tag '${GITHUB_REF_NAME}' is not vMAJOR.MINOR.PATCH" >&2
+              exit 1
+            fi
+            echo "manual=true" >> "$GITHUB_OUTPUT"
+          else
+            base="$(tr -d '[:space:]' < VERSION)"
+            if ! [[ "$base" =~ ^[0-9]+\.[0-9]+$ ]]; then
+              echo "VERSION must contain MAJOR.MINOR (e.g. 0.1), got '$base'" >&2
+              exit 1
+            fi
+            last="$(git tag --list "v${base}.*" | sed "s/^v${base}\.//" | grep -E '^[0-9]+$' | sort -n | tail -1 || true)"
+            patch=$(( ${last:-0} + 1 ))
+            version="${base}.${patch}"
+            echo "manual=false" >> "$GITHUB_OUTPUT"
+          fi
           echo "version=${version}" >> "$GITHUB_OUTPUT"
-          echo "major=${base%%.*}" >> "$GITHUB_OUTPUT"
           echo "Building v${version}"
 
       - name: Stamp version into project.godot
@@ -80,22 +93,32 @@ jobs:
           $GODOT --headless --export-release "Windows Desktop" build/windows/Giroflee.exe
           test -f build/windows/Giroflee.exe
 
+      # Two assets: the versioned zip, and a version-less copy so that
+      # https://github.com/<owner>/<repo>/releases/latest/download/Giroflee-windows.zip
+      # always points at the newest release.
       - name: Package
         run: |
           set -euo pipefail
           cd build/windows
           zip -r "../Giroflee-v${{ steps.version.outputs.version }}-windows.zip" .
+          cp "../Giroflee-v${{ steps.version.outputs.version }}-windows.zip" ../Giroflee-windows.zip
 
-      - name: Publish GitHub release (also creates the tag)
+      # Releases are normal (not pre-)releases, because GitHub never marks a pre-release as
+      # "Latest". Automatic builds on main are marked Latest; a hand-pushed tag keeps GitHub's
+      # default behaviour (the highest version wins), and may already have a release page.
+      - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          flags=""
-          if [ "${{ steps.version.outputs.major }}" = "0" ]; then flags="--prerelease"; fi
-          gh release create "v${{ steps.version.outputs.version }}" \
-            "build/Giroflee-v${{ steps.version.outputs.version }}-windows.zip" \
-            --target "${GITHUB_SHA}" \
-            --title "Giroflée v${{ steps.version.outputs.version }}" \
-            --generate-notes \
-            ${flags}
+          tag="v${{ steps.version.outputs.version }}"
+          versioned="build/Giroflee-${tag}-windows.zip"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "$versioned" build/Giroflee-windows.zip --clobber
+          elif [ "${{ steps.version.outputs.manual }}" = "true" ]; then
+            gh release create "$tag" "$versioned" build/Giroflee-windows.zip \
+              --verify-tag --title "Giroflée ${tag}" --generate-notes
+          else
+            gh release create "$tag" "$versioned" build/Giroflee-windows.zip \
+              --target "${GITHUB_SHA}" --title "Giroflée ${tag}" --generate-notes --latest
+          fi

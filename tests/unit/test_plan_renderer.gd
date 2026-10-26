@@ -74,7 +74,7 @@ func test_ghost_view_draws_the_chosen_sheets_in_grey_when_on() -> void:
 	TestKit.add_entity(s, "s2", "cave-text", "text", {"pos": [0, 0], "text": "Cave 1"})
 	s.run_one("sheet.update", {"id": "s1", "props": {"ghost_sheets": ["s2"]}})
 	assert_eq(PlanRenderer.build(_doc(), "s1").count_layer("walls_ghost"), 0, "off by default (FR-PLAN-7)")
-	s.run_one("sheet.update", {"id": "s1", "props": {"ghost_on": true}})
+	s.run_one("doc.set", {"section": "config", "key": "ghost_on", "value": true})
 	var list: DrawList = PlanRenderer.build(_doc(), "s1")
 	assert_eq(list.count_layer("walls_ghost"), 1)
 	assert_eq(list.count_layer("labels"), 0, "ghost shows no text")
@@ -85,7 +85,8 @@ func test_ghost_view_draws_the_chosen_sheets_in_grey_when_on() -> void:
 func test_frame_can_be_switched_off_and_by_axis() -> void:
 	assert_true(PlanRenderer.build(_doc(), "s1").count_layer("frame") > 0)
 	assert_eq(PlanRenderer.build(_doc(), "s1", {"frame": false}).count_layer("frame"), 0)
-	s.run_one("sheet.update", {"id": "s1", "props": {"frame_cols": 0, "frame_rows": 0}})
+	s.run_one("doc.set", {"section": "config", "key": "frame_cols", "value": 0})
+	s.run_one("doc.set", {"section": "config", "key": "frame_rows", "value": 0})
 	assert_eq(PlanRenderer.build(_doc(), "s1").count_layer("frame"), 0, "0 and 0 removes the frame")
 
 
@@ -96,7 +97,7 @@ func test_frame_labels_columns_and_rows() -> void:
 			texts.append(op.text)
 	assert_eq(texts.size(), 17 + 8)
 	assert_true(texts.has("1") and texts.has("17") and texts.has("A") and texts.has("H"))
-	s.run_one("sheet.update", {"id": "s1", "props": {"frame_cols": 0}})
+	s.run_one("doc.set", {"section": "config", "key": "frame_cols", "value": 0})
 	var rows_only: Array[String] = []
 	for op: DrawOp in PlanRenderer.build(_doc(), "s1").ops:
 		if op.layer == "frame" and op.kind == DrawOp.TEXT:

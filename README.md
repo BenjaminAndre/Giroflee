@@ -2,7 +2,7 @@
 
 Lean desktop tool to draw **domestic electrical plans** (plan de position + schéma unifilaire), built with Godot. First country pack: Belgium (RGIE). See [SRD.md](SRD.md) for the full requirements.
 
-Status: milestone M2 done: you can draw walls, doors, windows, stairs, blocks and labels on several étages, with undo, copy/paste, ghost view and autosave. Electric symbols and the unifilaire come next (M3, M4).
+Status: milestones M2 and M2b done: you can draw walls, doors, windows, stairs, blocks and labels on several étages (menu bar, tool bar, Affinity-style handles, smooth rendering), with undo, copy/paste, ghost view and autosave. Electric symbols and the unifilaire come next (M3, M4).
 
 ## Build and test
 
@@ -15,6 +15,7 @@ godot --headless --path . -- giroflee-cli run-script tests/scenarios/basic_floor
 GODOT=/path/to/godot tools/regen-golden.sh              # regenerate golden files after a deliberate change
 godot --path .                                          # start the editor (autosaved project is recovered)
 godot --path . -- --open some.giroflee                  # open a project file
+godot --headless --path . -s tools/make_branding.gd      # regenerate icon.png, icon.ico, splash.png from the SVG logos
 ```
 
 ## Licence

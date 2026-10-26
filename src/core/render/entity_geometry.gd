@@ -247,6 +247,19 @@ static func bounds(entity: Entity, ctx: RenderContext) -> Rect2:
 	return Rect2(origin, Vector2.ZERO).grow(100.0)
 
 
+## Bounds of the entity's geometry without line thickness (a wall is just its centre line).
+## This is what the transform box scales and rotates, so that scaling a wall moves its points
+## exactly with the cursor.
+static func core_bounds(entity: Entity, ctx: RenderContext) -> Rect2:
+	if entity.type == "wall":
+		var points: Array = entity.props["points"]
+		var path: PackedVector2Array = PackedVector2Array()
+		for point: Variant in points:
+			path.append(vec(point))
+		return _bounds_of(path)
+	return bounds(entity, ctx)
+
+
 ## Distance from `p` to the entity's drawn shape; 0 when inside.
 static func distance_to(entity: Entity, ctx: RenderContext, p: Vector2) -> float:
 	var props: Dictionary = entity.props

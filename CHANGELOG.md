@@ -18,10 +18,16 @@ Versions are `vMAJOR.MINOR.PATCH`: `MAJOR.MINOR` come from the `VERSION` file, `
 - Editor logic separated from widgets (`EditorModel`, tools, `EditorInput`), so the whole editor is testable headlessly.
 - Tests: 305 in total, including replay tests that drive the real window, a 2000-entity performance check and an opt-in screenshot test (`tests/visual`).
 
+- **M2b: test feedback and look** (SRD section 19.5): previews that look exactly like the finished walls, blocks, openings and stairs; Affinity-style transform box (8 resize handles, rotation handle, Shift / Alt modifiers); smooth diagonal walls (Vulkan "Mobile" renderer with 4x 2D multisampling, measured on screenshots; OpenGL fallback); project-wide display settings (frame, title position, ghost view, A4/A3 hints) with **format 2** and an automatic migration from format 1; menu bar (Fichier, Édition, Étage, Affichage, Projet); icon-only tool bar with hot-key tooltips (hide/show in Affichage, remembered per user); Catppuccin Latte light theme; SVG icon set; Giroflée logo (SVG, PNG, multi-size ICO), splash screen with the Godot logo, window icon.
+- Tests: transform handles, project-wide settings and migration, menu bar and tool bar in the real window, theme tokens and contrast, icons, logo at 256 and 32 px, ICO structure, splash; opt-in visual tests for antialiasing and handle/preview screenshots; 2D renderer settings guarded by a unit test.
+- `tools/make_branding.gd` regenerates the raster branding assets.
+
 ### Changed
+- CI: releases are normal releases marked **Latest** (pre-releases can never be "Latest"), with a version-less `Giroflee-windows.zip` asset for a stable latest-download link; a tag pushed by hand (`vX.Y.Z`) builds and publishes that exact version. Existing v0.1.1 to v0.1.3 are untouched.
 - CLI: `run-script` moved from "planned" to implemented.
 - Schema: the opening property `hinge` was removed (the flips already carry it: DRY); sheets gained `title_pos_mm`; the golden file was regenerated.
 - `entity.move` now also moves the openings hosted by a moved wall; `entity.remove` frees the openings of a removed wall.
+- Properties of a sheet: the frame, title position, ghost switch and hints moved to the project config (the grey block lost its own corner handles; the transform box replaces them). Wall previews are drawn like finished walls.
 - `tests/golden` and `.gutconfig.json`: the default suite runs `tests/unit` and `tests/integration` only; `tests/visual` is opt-in.
 
 ## [0.1.1] — M0 scaffold

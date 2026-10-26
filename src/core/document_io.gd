@@ -69,6 +69,9 @@ static func from_dict(raw: Dictionary, registry: Dictionary = Migrations.default
 	if not JsonUtil.flag(config, "ok"):
 		return _fail("config: %s" % str(config["error"]))
 	doc.config = config["props"]
+	var config_problem: String = Schema.check_config(doc.config)
+	if not config_problem.is_empty():
+		return _fail("config: %s" % config_problem)
 
 	for section_name: String in Schema.FREE_SECTIONS:
 		if not JsonUtil.has_dict(data, section_name):

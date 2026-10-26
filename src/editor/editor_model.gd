@@ -39,6 +39,8 @@ var viewport_size: Vector2 = Vector2(1200.0, 800.0)
 ## Last pointer position (world mm) and its snapped version, for previews and the status bar.
 var hover: Vector2 = Vector2.ZERO
 var hover_snap: SnapEngine.Result = null
+## Transform handle under the pointer ("nw", "rotate", "vertex"...), "" if none; drives the cursor.
+var hover_handle: String = ""
 ## Where Clipboard text lives. The UI replaces these with the system clipboard.
 var clipboard_text: String = ""
 var clipboard_get: Callable = Callable()
@@ -141,6 +143,7 @@ func set_tool(name: String) -> void:
 	if tool != null:
 		tool.cancel(self)
 	tool_name = name
+	hover_handle = ""
 	match name:
 		"wall":
 			tool = WallTool.new()
@@ -216,13 +219,14 @@ func selected_entities() -> Array[Entity]:
 	return out
 
 
-## Bounding box of the selection in world mm (empty Rect2 when nothing is selected).
-func selection_bounds() -> Rect2:
+## Bounding box of the selection in world mm (empty Rect2 when nothing is selected). With
+## `core`, line thickness is ignored (what the transform box scales and rotates).
+func selection_bounds(core: bool = false) -> Rect2:
 	var rect: Rect2 = Rect2()
 	var first: bool = true
 	var context: RenderContext = ctx()
 	for entity: Entity in selected_entities():
-		var b: Rect2 = EntityGeometry.bounds(entity, context)
+		var b: Rect2 = EntityGeometry.core_bounds(entity, context) if core else EntityGeometry.bounds(entity, context)
 		rect = b if first else rect.merge(b)
 		first = false
 	return rect
@@ -307,6 +311,20 @@ func rotate_selection(ccw: bool) -> void:
 		var turned: Dictionary = EntityMover.rotated_props_90(entity.type, entity.props, pivot, ccw)
 		items.append({"id": entity.id, "props": _changed_props(entity.props, turned)})
 	update_entities(items)
+
+
+## Commits the result of a transform-box gesture ({id: new props}) as one undo step.
+func apply_transform(props_by_id: Dictionary) -> void:
+	var items: Array = []
+	for key: Variant in props_by_id.keys():
+		var entity_id: String = str(key)
+		var entity: Entity = sheet().entities[entity_id]
+		var after: Dictionary = props_by_id[key]
+		var diff: Dictionary = _changed_props(entity.props, after)
+		if not diff.is_empty():
+			items.append({"id": entity_id, "props": diff})
+	if not items.is_empty():
+		update_entities(items)
 
 
 ## Subset of `after` whose values differ from `before`.
@@ -422,7 +440,7 @@ func cycle_sheet(step: int) -> void:
 func new_sheet() -> void:
 	var source: Sheet = sheet()
 	var props: Dictionary = {"name": _free_name(tr("Étage"))}
-	for key: String in ["paper_w_mm", "paper_h_mm", "scale_den", "frame_cols", "frame_rows", "grid_step_mm", "hints", "title_pos_mm"]:
+	for key: String in ["paper_w_mm", "paper_h_mm", "scale_den", "grid_step_mm"]:
 		props[key] = JsonUtil.deep_copy(source.props[key])
 	var sheet_id: String = new_id()
 	var index: int = doc().sheet_order.find(active_sheet_id) + 1
@@ -483,23 +501,29 @@ func set_config(key: String, value: Variant) -> CommandResult:
 	return _run("doc.set", {"section": "config", "key": key, "value": value})
 
 
+## The ghost-view switch is project-wide; which étages are ghosted stays per sheet. On first use
+## in an étage with no choice yet, the étage just below in the tab order is shown. One undo step.
 func toggle_ghost() -> void:
-	var on: bool = sheet().props["ghost_on"]
+	var on: bool = doc().config["ghost_on"]
+	var commands: Array[Command] = [session.command("doc.set", {"section": "config", "key": "ghost_on", "value": not on})]
 	var ghosts: Array = sheet().props["ghost_sheets"]
-	var props: Dictionary = {"ghost_on": not on}
 	if not on and ghosts.is_empty():
-		# first use: show the étage just below in the tab order
 		var index: int = doc().sheet_order.find(active_sheet_id)
+		var pick: String = ""
 		if index > 0:
-			props["ghost_sheets"] = [doc().sheet_order[index - 1]]
+			pick = doc().sheet_order[index - 1]
 		elif doc().sheet_order.size() > 1:
-			props["ghost_sheets"] = [doc().sheet_order[1]]
-	set_sheet_props(props)
+			pick = doc().sheet_order[1]
+		if not pick.is_empty():
+			commands.append(session.command("sheet.update", {"id": active_sheet_id, "props": {"ghost_sheets": [pick]}}))
+	var result: CommandResult = session.run(commands)
+	if not result.ok:
+		notice.emit(result.error)
 
 
 func toggle_hints() -> void:
-	var on: bool = sheet().props["hints"]
-	set_sheet_props({"hints": not on})
+	var on: bool = doc().config["hints"]
+	set_config("hints", not on)
 
 
 # --- history ------------------------------------------------------------------------------

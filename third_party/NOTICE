@@ -4,4 +4,11 @@ Third-party components
 - GUT (Godot Unit Test) 9.6.1, addons/gut — MIT License — https://github.com/bitwes/Gut
   (development and CI only; excluded from exported builds)
 
+- Catppuccin Latte colour palette (the interface theme) — MIT License — https://github.com/catppuccin/catppuccin
+  (colour values only, no code)
+- Godot logo (assets/branding/godot_logo.svg, shown on the splash screen next to the Giroflée mark) —
+  Creative Commons Attribution 4.0 International (CC BY 4.0), Copyright (c) 2017 Andrea Calabró —
+  https://github.com/godotengine/godot/tree/master/misc/logo (licence text: assets/branding/GODOT_LOGO_LICENSE.txt)
+- Giroflée logo and icons (assets/branding/, assets/icons/) — drawn for this project, CC0.
+
 Fonts (Atkinson Hyperlegible, OpenDyslexic; SIL OFL) will be listed here with their licence texts when they are bundled (milestone M7).

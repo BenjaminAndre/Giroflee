@@ -20,7 +20,7 @@ func test_add_sheet_with_defaults_appends_in_order() -> void:
 	assert_eq(sheet.kind, "plan")
 	assert_eq(sheet.display_name(), "Cave")
 	assert_eq(sheet.props["paper_w_mm"], 420, "A3 landscape by default")
-	assert_eq(sheet.props["ghost_on"], false, "ghost view off by default")
+	assert_eq(sheet.props["ghost_sheets"], [], "no étage ghosted until chosen")
 
 
 func test_add_sheet_at_index() -> void:
@@ -45,13 +45,12 @@ func test_add_sheet_rejects_bad_input() -> void:
 
 func test_update_sheet_renames_and_configures() -> void:
 	TestKit.add_sheet(s, "a", "Rez")
-	var result: CommandResult = s.run_one("sheet.update", {"id": "a", "props": {"name": "Rez-de-chaussée", "frame_cols": 0, "ghost_on": true}})
+	var result: CommandResult = s.run_one("sheet.update", {"id": "a", "props": {"name": "Rez-de-chaussée", "scale_den": 100}})
 	assert_true(result.ok, result.error)
 	var sheet: Sheet = _doc().get_sheet("a")
 	assert_eq(sheet.display_name(), "Rez-de-chaussée")
-	assert_eq(sheet.props["frame_cols"], 0, "0 columns removes the frame on that axis (SRD FR-PLAN-8)")
-	assert_eq(sheet.props["ghost_on"], true)
-	assert_eq(sheet.props["scale_den"], 50, "other props untouched")
+	assert_eq(sheet.props["scale_den"], 100)
+	assert_eq(sheet.props["paper_w_mm"], 420, "other props untouched")
 
 
 func test_update_with_same_values_is_an_empty_patch_and_not_recorded() -> void:
@@ -66,7 +65,7 @@ func test_update_with_same_values_is_an_empty_patch_and_not_recorded() -> void:
 func test_ghost_references_are_validated() -> void:
 	TestKit.add_sheet(s, "a")
 	TestKit.add_sheet(s, "b")
-	assert_true(s.run_one("sheet.update", {"id": "a", "props": {"ghost_sheets": ["b"], "ghost_on": true}}).ok)
+	assert_true(s.run_one("sheet.update", {"id": "a", "props": {"ghost_sheets": ["b"]}}).ok)
 	assert_false(s.run_one("sheet.update", {"id": "a", "props": {"ghost_sheets": ["a"]}}).ok, "cannot ghost itself")
 	assert_false(s.run_one("sheet.update", {"id": "a", "props": {"ghost_sheets": ["nope"]}}).ok)
 
@@ -83,7 +82,7 @@ func test_remove_sheet_removes_entities_and_ghost_references() -> void:
 	TestKit.add_sheet(s, "b")
 	TestKit.add_wall(s, "b", "w1", [[0, 0], [100, 0]])
 	TestKit.add_symbol(s, "b", "sym", [0, 0])
-	s.run_one("sheet.update", {"id": "a", "props": {"ghost_sheets": ["b"], "ghost_on": true}})
+	s.run_one("sheet.update", {"id": "a", "props": {"ghost_sheets": ["b"]}})
 	var result: CommandResult = s.run_one("sheet.remove", {"id": "b"})
 	assert_true(result.ok, result.error)
 	assert_eq(_doc().sheet_order, ["a"])

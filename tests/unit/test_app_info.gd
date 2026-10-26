@@ -21,3 +21,12 @@ func test_strict_typing_warnings_are_errors() -> void:
 	]:
 		var value: int = ProjectSettings.get_setting("debug/gdscript/warnings/" + setting, 0)
 		assert_eq(value, 2, "%s must be set to Error (2)" % setting)
+
+
+func test_the_project_uses_the_multisampled_2d_renderer() -> void:
+	# SRD FR-RENDER-2: the Compatibility renderer has no 2D multisampling, so diagonal walls would be jagged
+	assert_eq(str(ProjectSettings.get_setting("rendering/renderer/rendering_method")), "mobile")
+	var msaa: int = ProjectSettings.get_setting("rendering/anti_aliasing/quality/msaa_2d")
+	assert_eq(msaa, 2, "4x multisampling for 2D")
+	var fallback: bool = ProjectSettings.get_setting("rendering/rendering_device/fallback_to_opengl3")
+	assert_true(fallback, "machines without Vulkan still start")

@@ -1,6 +1,6 @@
 # Giroflée — Software Requirements Document
 
-Status: **draft 0.6** · Progress: see section 0.1 · Language of this document: English · Language of the product: French (v0.1)
+Status: **draft 0.7** · Progress: see section 0.1 · Language of this document: English · Language of the product: French (v0.1)
 Audience: the author, and Claude (as the implementing agent). Technical notes are mixed in on purpose and marked **[TECH]**. Requirements are numbered so code, tests and commits can cite them (`FR-…`, `ARCH-…`, `PACK-…`, `LIC-…`).
 
 Keywords: MUST / SHOULD / MAY as in RFC 2119. Everything here has been decided by the author unless it appears in the pending list of section 18.
@@ -24,7 +24,8 @@ Keywords: MUST / SHOULD / MAY as in RFC 2119. Everything here has been decided b
 | M0 Scaffold, CI, CLI skeleton, replay harness | **Done** (released as v0.1.1; the first real CI run, Windows export and release included, worked) |
 | M1 Core: model, commands, resolver, history, JSON save/load, CLI `run-script` | **Done** (section 19; 134 tests) |
 | M2 Canvas and plan editing | **Done** (section 19.4; 305 tests; some keys marked ASSUMED, section 18) |
-| M3 – M7 | Not started (M3 next) |
+| M2b Test feedback and look (section 19.5): previews that look final, project-wide settings, menu bar, tool bar, Affinity-style handles, antialiased rendering, Latte theme, logo and app icon | **Done** (406 tests; open interpretations in section 18) |
+| M3 – M7 | Not started (M3 follows M2b) |
 
 ---
 
@@ -46,7 +47,9 @@ It is essentially a focused vector editor ("a glorified SVG editor") with a cura
 - **The plan is the source of truth.** Everything that can be derived from it (the unifilaire rows, point counts, labels, the report) is derived, never typed again. *This is to avoid entering the same information twice. DRY (Don't Repeat Yourself), as in code.* The same principle applies inside the plan: the floor name is typed once and appears on the tab, the sheet and the cartouche; a project-wide font is set once; a symbol's artwork is defined once and reused by every instance.
 - **Lean.** A few important elements instead of hundreds of decorations. A feature that does not make plan drawing faster is rejected by default.
 - **Keyboard first, mouse friendly.** Modal, vim-like shortcuts, command palette (a little Factorio-like in feel: pipette, fast repeat).
-- **No dialogs.** Sane defaults, everything changeable at any time from docked panels. The only mandatory popup is the export disclaimer (FR-LEG-1).
+- **No dialogs.** Sane defaults, everything changeable at any time from docked panels and the menu bar. The only mandatory popup is the export disclaimer (FR-LEG-1).
+- **Light only.** The interface uses the Catppuccin **Latte** (light) palette. Plans are printed on white paper, so there is no dark mode and none is planned (FR-UI).
+- **What you see is what you get.** A preview while drawing looks exactly like the result (FR-PREV).
 - **Clear, accessible output.** Readable by everyone, including colour-blind and dyslexic users.
 - **Honest.** The tool assists. The author of a drawing remains responsible for its accuracy.
 
@@ -91,6 +94,9 @@ It is essentially a focused vector editor ("a glorified SVG editor") with a cura
 | Cartouche | Title block at the bottom of a sheet |
 | Cadre / repérage | Border frame with columns (1…n) and rows (A…n) |
 | Pack | Country bundle: symbols, rules, catalogue, cartouche template |
+| Barre d'outils | Vertical column of tool buttons at the left of the canvas (FR-TOOLBAR) |
+| Poignées | The handles around a selection used to resize and rotate it, as in Affinity (FR-HANDLE) |
+| Barre de menus | Menu bar at the top: Fichier, Édition, Étage, Affichage, Projet (FR-MENU) |
 
 ## 5. Domain model
 
@@ -100,7 +106,7 @@ All entities have a UUID, are plain data, and live in a **Document**.
 
 ```
 Project
- ├─ config            (project-wide settings, changeable any time, undoable: fonts, grid, frame…)
+ ├─ config            (project-wide settings, changeable any time, undoable: fonts, wall weight, border frame (columns, rows), étage-title position, ghost view on/off, A4/A3 hints, PROVISOIRE mark)
  ├─ pack_ref          (e.g. "belgium" + version)
  ├─ cartouche         (template + field values)
  ├─ board             (head chain + bus + circuit order; section 8)
@@ -109,7 +115,7 @@ Project
  └─ sheets[]          (ordered; each a tab)
      ├─ kind: "plan" | "unifilaire"
      ├─ name              (étage name; the single source of the name, DRY)
-     ├─ paper (size, orientation), scale, grid, frame (cols, rows), ghost (which étages), hints
+     ├─ paper (size, orientation), scale, grid step, ghost étages (which ones are shown)
      ├─ background (image/PDF ref, transform, opacity)  [plan only]
      └─ entities[]
           Wall · Opening(door|window) · Stair · GreyBlock · TextLabel · ElectricSymbol
@@ -138,16 +144,35 @@ The **étage name** is shown automatically as a large dark-red title on the shee
 ## 6. Plan-sheet editing (FR-PLAN)
 
 ### 6.1 Canvas
-- **FR-PLAN-1** Infinite canvas with dot grid and snapping (grid, wall endpoints/midpoints, wall faces). Faint **hints for the A4 and A3 page borders** (dashed outlines at the sheet's current scale, anchored to the sheet's paper origin) so the user sees what will fit; togglable. Grid step and snap are configurable at any time.
+- **FR-PLAN-1** Infinite canvas with dot grid and snapping (grid, wall endpoints/midpoints, wall faces). Faint **hints for the A4 and A3 page borders** (dashed outlines at the sheet's current scale, anchored to the sheet's paper origin) so the user sees what will fit; togglable (a **project-wide** setting, FR-PROJ-1). Grid step and snap are configurable at any time.
 - **FR-PLAN-2** Navigation like Affinity: wheel = vertical pan, Shift+wheel = horizontal pan, Ctrl+wheel = zoom at cursor, Space+drag and middle-drag = pan. All remappable.
 - **FR-PLAN-3** Walls: polyline tool, grid/object snapping, live length readout, orthogonal by default, Shift for free angle.
 - **FR-PLAN-4** Door, window, stair are parametric. `H` flips horizontally, `V` flips vertically (also during placement), `R` rotates, `Shift+R` rotates the other way.
 - **FR-PLAN-5** Plans can be drawn **by hand on the blank grid**, no import and no scale accuracy required, in minutes.
 - **FR-PLAN-6** Background import: image (PNG/JPG) and PDF page, as a locked, adjustable-opacity layer with two-point scale calibration; excluded from export unless the user opts in. **[TECH]** PDF import may follow images inside v0.1 if Godot has no built-in PDF rasteriser.
-- **FR-PLAN-7** **Ghost view**: shows other étages in light grey on the current sheet. Togglable per sheet, **off by default**, and configurable to show **any** étage (one or several). Étages are *named*, not numbered, and have no assumed vertical order (real houses are wonkier than −1/0/+1/+2); the tab order is whatever the user sets. Never exported.
-- **FR-PLAN-8** Border frame: configurable columns and rows. A count of **0 removes the frame on that axis**. Cosmetic by default; usable as a position reference in the report.
+- **FR-PLAN-7** **Ghost view**: shows other étages in light grey on the current sheet. The on/off switch is **project-wide** (FR-PROJ-1; **off by default**); *which* étages are shown stays **per sheet** and can be **any** étage (one or several). Étages are *named*, not numbered, and have no assumed vertical order (real houses are wonkier than −1/0/+1/+2); the tab order is whatever the user sets. Never exported.
+- **FR-PLAN-8** Border frame: configurable columns and rows, **project-wide** (FR-PROJ-1), so every étage has the same frame. A count of **0 removes the frame on that axis**. Cosmetic by default; usable as a position reference in the report.
 - **FR-PLAN-9** Paper: any size and orientation can be set at any time; default A-series landscape (A3). The plan lives in real-world mm; the frame and cartouche scale with the page. Retargeting the page size at export (A4, A3, …) applies a uniform scale.
 - **FR-PLAN-10** Objects outside the paper rectangle raise a warning (they would be cut at export).
+
+- **FR-PROJ-1** **Project-wide display settings** (stored in the project `config`, shared by every étage, one change reaches all sheets; DRY): border frame columns and rows, position of the étage title, ghost view on/off, A4/A3 hints on/off. They are reachable from the menu bar (FR-MENU) and from the "Projet" section of the Properties panel. Paper size, scale and grid step stay per sheet; the ghost *selection* (which étages) stays per sheet.
+
+### 6.1b Previews look final (FR-PREV)
+- **FR-PREV-1** While a wall, block, opening or stair is being drawn, the preview is **drawn exactly as the finished object will be**: same colour, line weight, mitred joins and fill, not a tinted or translucent outline. A wall shows up as a wall from its first segment on (author feedback: the blue preview was confusing). Only a live length readout and the snap marker are extra, and both are visually neutral (not wall-coloured).
+- **FR-PREV-2** The preview is computed by the same code as the final drawing (`EntityGeometry.add_ops`), so the two cannot differ.
+
+### 6.1c Transform handles (FR-HANDLE)
+Resizing and rotating work **like in Affinity**, with handles around the selection.
+- **FR-HANDLE-1** A selection (one or several entities) shows a **bounding box with 8 resize handles** (4 corners, 4 edge middles) and **one rotation handle** above the top edge, linked to it by a stem. The box is drawn a few pixels **outside** the entities so its handles never sit on top of an entity's own vertex handles. The cursor changes over each handle (resize arrows, a rotation indication).
+- **FR-HANDLE-2** **Corner handle** = scale from the opposite corner; **edge handle** = scale along that axis only. **Shift** keeps the proportions, **Alt** scales from the centre of the box. **Rotation handle** = rotate about the centre of the box; **Shift** snaps to 15° steps. (Modifiers as in Affinity, as the author asked.)
+- **FR-HANDLE-3** The result is previewed live (FR-PREV) and committed as **one undo step** on release. Dragging a handle never changes the selection.
+- **FR-HANDLE-4** What scaling means for each entity (positions are scaled; sizes where the entity has a size): wall: its points; grey block: its size; opening: its width; stair: its width and its tread (the number of steps is kept); text: its font size (the average scale factor); electric symbol: **position only** (a symbol's size is the project-wide symbol scale, FR-CSYM-2). Openings hosted by a scaled or rotated wall follow it (position and angle) without changing width. Integer millimetres are kept (rounded).
+- **FR-HANDLE-5** Rotation turns positions about the pivot, adds the angle to the entity's own `rotation` and rotates wall points; 90° steps (`R`, `Shift+R`) stay exact.
+- **FR-HANDLE-6** A single selected wall also keeps its **vertex handles** (drag a vertex), as in M2; they take priority over the box handles. The separate corner handles of a grey block are replaced by the box handles.
+
+### 6.1d Rendering quality (FR-RENDER)
+- **FR-RENDER-1** Walls and every other filled shape have **smooth, antialiased edges at any angle and zoom**; diagonal walls must not look jagged or stair-stepped, and corners between segments at any angle (including acute ones) must be clean mitres.
+- **FR-RENDER-2** The mechanism is chosen **by measurement** on screenshots of walls at many angles and zooms (engine multisampling for 2D, antialiased outlines, or a plugin). **Decided (section 19.5): the Vulkan "Mobile" renderer with 4x 2D multisampling**, because the OpenGL Compatibility renderer has no 2D multisampling. The geometry stays in our own DrawList (SVG and PDF export must not depend on a plugin); a third-party plugin is adopted only if it clearly beats the built-in options and its licence is compatible (section 14).
 
 ### 6.2 Electric symbols
 - **FR-SYM-1** v0.1 symbol set (Belgian pack): **interrupteur**, **interrupteur va-et-vient**, **lampe**, **prise**, plus the **TGBT** and **compteur kWh** markers (shown in green on the plan).
@@ -241,8 +266,20 @@ Vim-like: a **Normal** mode (select) and tool states. `Esc` always returns to Se
 - **FR-KEY-2** `C` enters a short-lived circuit-picker state that shows the available letters on screen.
 
 ### 7.1 No-dialog configuration (FR-CFG)
-- **FR-CFG-1** No settings dialog, no startup wizard. Defaults are sane. A docked, context-sensitive **Properties panel**: with nothing selected it shows sheet/project settings (paper, scale, grid, frame, hints, ghost, fonts, cartouche fields); with a selection it shows that entity's properties. Every change is a command (undoable).
+- **FR-CFG-1** No settings dialog, no startup wizard. Defaults are sane. A docked, context-sensitive **Properties panel**: with nothing selected it shows the étage settings (name, paper, scale, grid, ghost étages) and the **project settings** (frame, title position, ghost view, hints, fonts, wall weight, cartouche fields); with a selection it shows that entity's properties. Every change is a command (undoable).
 - **FR-CFG-2** **One project per window; the tabs of a window are the étages of that project** (plus the unifilaire tab). `Ctrl+N` opens another window. **Autosave and silent recovery** at next launch replace any "save changes?" dialog.
+
+### 7.2 Menu bar (FR-MENU)
+- **FR-MENU-1** A menu bar sits at the top of the window with **Fichier**, **Édition**, **Étage**, **Affichage** and **Projet**. Every command is also in the command palette; a menu item shows its shortcut only when the author approved one (WA-1).
+- **FR-MENU-2** **Fichier**: Nouveau projet (nouvelle fenêtre) `Ctrl+N`, Ouvrir…, Enregistrer, Enregistrer sous…. **Édition**: Annuler `Ctrl+Z`, Rétablir `Ctrl+Y`, Couper, Copier, Coller, Dupliquer, Supprimer, Tout sélectionner. **Étage**: Nouvel étage `Ctrl+T`, Dupliquer, Dupliquer avec les symboles, Renommer `F2`, Supprimer.
+- **FR-MENU-3** **Affichage** holds the checkable display options: **Étage fantôme** and **Repères A4 / A3** (project-wide, FR-PROJ-1), **Accrochage**, **Barre d'outils** (FR-TOOLBAR). **Projet** holds **Réglages du projet**, which shows the project settings in the Properties panel (no popup window for settings).
+- **FR-MENU-4** Check items always reflect the current state and are undoable when they change the project.
+
+### 7.3 Tool bar (FR-TOOLBAR)
+- **FR-TOOLBAR-1** A vertical **tool bar** at the left of the canvas, like Affinity, with one **icon-only** button per tool (select, wall, door, window, stair, grey block, text; the symbol tools join it in M3). It exists for users who do not know the hot keys; the keyboard stays the fast path.
+- **FR-TOOLBAR-2** Each button has a **tooltip with the tool name and its hot key** (e.g. "Mur (W)"). The active tool is shown as pressed and follows the keyboard (pressing `W` presses the wall button).
+- **FR-TOOLBAR-3** The tool bar can be hidden and shown from the Affichage menu; it is **visible by default**. The choice is a user preference stored outside the project (`user://prefs.json`).
+- **FR-TOOLBAR-4** The icons are SVG files drawn for Giroflée (assets under `assets/icons/`, CC0), duotone, rendered at the needed size from the theme colours (so they follow the palette and stay crisp at any UI scale).
 
 ## 8. The unifilaire (FR-UNI)
 
@@ -387,7 +424,7 @@ Added later **on need**. Seed content for `catalog.json`:
 - **FR-LOOK-1** The **default theme reproduces the author's earlier plans** (style tokens below). Goal: same information, same readability, not pixel-exactness.
 - **FR-LOOK-2** **Circuit colours on screen** (side panel, selection tint) come from a **colour-blind-safe palette** (e.g. Okabe–Ito for 8 colours, extended with shapes/patterns beyond). Colour is **never the only carrier of information**: the circuit letter is always shown. Exported documents are black-and-white by default.
 - **FR-LOOK-3** Fonts: per FR-TXT (Atkinson Hyperlegible default, OpenDyslexic selectable, both OFL; project-wide setting plus per-node override).
-- **FR-LOOK-4** UI scaling and a high-contrast option.
+- **FR-LOOK-4** UI scaling and a high-contrast option. (No dark mode: see FR-UI-1.)
 - **FR-LOOK-5** French everywhere in v0.1. **[TECH]** all user-facing strings go through `tr()` keys with `fr` as the only shipped locale. Identifiers and code comments are in English.
 
 ### 12.1 Default style tokens (measured on the author's earlier A3 plans, 3508 × 2481 px = 8.35 px/mm)
@@ -402,11 +439,24 @@ Added later **on need**. Seed content for `catalog.json`:
 | Dot grid | light grey dots (≈ `#9A9A9A`) |
 | Frame | ≈ 24 mm per column on A3 (17 columns × 8 rows), border at the page edge, cartouche at the bottom |
 
+### 12.2 Interface look (FR-UI)
+- **FR-UI-1** The interface uses the **Catppuccin Latte** palette (light; MIT licence, credited in `third_party/NOTICE`). There is no dark theme. The plans themselves keep their own colours (section 12.1).
+- **FR-UI-2** Tokens (Latte): base `#eff1f5` (panels, fields), mantle `#e6e9ef` (tool bar, status bar), crust `#dce0e8` (workspace around the page), surface0 `#ccd0da` / surface1 `#bcc0cc` (buttons, borders), text `#4c4f69`, subtext0 `#6c6f85`, overlay0 `#9ca0b0` (disabled), accent blue `#1e66f5` (selection, active tool, focus), red `#d20f39` (errors), peach `#fe640b` (snap marker), green `#40a02b` (confirmation).
+- **FR-UI-3** The theme is built in code (`AppTheme`) from these tokens and applied to the whole window; widgets do not set ad-hoc colours.
+- **FR-UI-4** The logo's own yellow and green are reserved for the logo and for the icon set's accent, where they may carry the "earth conductor" association; they are not general interface colours.
+- **FR-UI-5** Fonts: the engine default until the bundled fonts arrive (M7).
+
+### 12.3 Logo, application icon and splash screen (FR-BRAND)
+- **FR-BRAND-1** The mark is a **four-petal wallflower** (the giroflée): rounded petals, two yellow and two green alternating around a small dark centre with a white ring, outlined in Latte text colour `#4c4f69`; yellow `#F5D928`, green `#319447` (conductor colours, decided in the logo discussion). No lettering.
+- **FR-BRAND-2** It exists as **SVG** (`assets/branding/logo.svg`, with the four fine inner lines) and a **simplified SVG without them** for small sizes, and must stay readable at **32 × 32 px** (an automated test checks that the rendered 32 px mark still contains both colours and the outline).
+- **FR-BRAND-3** Generated assets (committed): PNG sizes, a multi-size **`icon.ico`** (16 to 256 px), and a **boot splash** that shows the Giroflée mark **together with the Godot logo** ("Fait avec Godot", Godot logo CC BY 4.0, attribution in `third_party/NOTICE`) on a Latte background. The window icon is set at run time.
+- **FR-BRAND-4** Limitation: embedding the `.ico` into the Windows executable needs the `rcedit` tool at export time, which the Linux CI does not have; until that is solved the exe keeps the default icon and the window and splash use the logo. (Pending decision, section 18.)
+
 ## 13. Export and persistence
 
 ### 13.1 Project file
 - **FR-FILE-1** Single file `*.giroflee`, **plain JSON**, UTF-8, pretty-printed with stable key order and entities sorted by id, so it diffs cleanly in git. Contains `format_version`, `pack_ref`, config, cartouche, board, circuits, sheets, entities, acknowledgements and the optional `ui` block.
-- **FR-FILE-2** `format_version` plus an explicit **migration** chain; an older file MUST open (never silently drop data).
+- **FR-FILE-2** `format_version` plus an explicit **migration** chain; an older file MUST open (never silently drop data). Format 2 (M2b) moves the frame, title position, ghost on/off and hints from each sheet to the project `config`; the migration takes the values of the first sheet.
 - **FR-FILE-3** Autosave with silent recovery; no "save changes?" prompt.
 - **FR-FILE-4** Background images are stored beside the project (`<name>.giroflee.assets/`), referenced by relative path.
 
@@ -453,7 +503,8 @@ Files (provided in this repo): `.github/workflows/ci.yml`, `.github/actions/setu
 - **CI-3** **Version scheme `vMAJOR.MINOR.PATCH`:**
   - `MAJOR.MINOR` come from the **`VERSION` file** at the repo root (a single line such as `0.1`). The author changes it by hand and commits it.
   - `PATCH` is **bumped automatically on each build**: next patch = 1 + the highest existing tag `vMAJOR.MINOR.*` (1 if none). Changing `VERSION` therefore restarts the patch counter at 1.
-  - While `MAJOR` is 0, releases are marked as **pre-releases**.
+  - Releases are normal releases (not pre-releases, which GitHub never marks "Latest"). Each automatic build is marked **Latest**, and every release carries two assets: `Giroflee-v<version>-windows.zip` and a version-less `Giroflee-windows.zip`, so `.../releases/latest/download/Giroflee-windows.zip` is a stable link to the newest build. All earlier releases stay available.
+  - A tag pushed by hand (e.g. `v0.2.0`) builds and publishes exactly that version (or adds the assets to a release page that already exists).
   - A commit message containing `[skip release]` skips the release job.
 - **CI-4** The version string is written into `project.godot` (`config/version`) before export, so the app and the SVG `generator` metadata show it.
 - **CI-5** Godot and export templates are downloaded from the official `godot-builds` release for the pinned version. Linux export can be added later by adding an export preset.
@@ -468,6 +519,7 @@ Every milestone is done only when its tests (WA-6, section 15.3) pass in CI.
 1. **M0** Project scaffold (Godot 4.7.2, strict typing settings, GUT, export preset, CLI entry point, replay harness skeleton, CI green on an empty test).
 2. **M1** Core: document model, commands, resolver, history, JSON save/load with migrations, CLI `run-script`, tests.
 3. **M2** Canvas: navigation, grid/hints, walls, openings, stairs, grey blocks, text, snapping, selection, copy/paste, tabs/étages, duplicate étage, ghost.
+3b. **M2b** Test feedback and look: previews that look final, project-wide display settings (format 2), menu bar, tool bar with icons, Affinity-style handles, antialiased rendering, Latte theme, logo, app icon and splash.
 4. **M3** Symbols: pack loader, SVG subset validator, placement, circuits, indices, Alt-place, pipette, quickbar, circuit focus, copy settings, select-by-filter, wall orientation, label solver, anchoring/stacks, `count`.
 5. **M4** Unifilaire derivation and rendering; board editor (head chain, bus, circuit order); cartouche editor.
 6. **M5** Report panel and rules (template filled by the author).
@@ -486,3 +538,124 @@ Every milestone is done only when its tests (WA-6, section 15.3) pass in CI.
 5. **Save and open keys:** `Ctrl+S` / `Ctrl+O` (or others) are not bound; "Enregistrer", "Enregistrer sous…" and "Ouvrir un projet…" are palette commands only.
 6. **Box selection semantics:** it selects entities that touch the box (not only those fully inside).
 7. **Palette command for the page fit:** none (the author declined "zoom to content"); the page is fitted when an étage is first shown.
+8. **M2b interpretations to confirm:** (a) feedback "the wall just draw as soon as we start" is read as *the wall should look like a wall from the first segment on* (FR-PREV), not as "commit each segment immediately"; (b) A4/A3 hints are made project-wide together with the frame, title and ghost switch (the author listed the first three; hints are a display aid of the same kind); (c) paper size and scale stay per sheet.
+9. **Executable icon:** how to embed `icon.ico` in the Windows exe from the Linux CI (needs `rcedit`, normally via Wine), or build the Windows export on a Windows runner.
+11. **Logo fidelity:** the vector logo is a hand-built approximation of the supplied raster (petal shape, notch and inner lines are close, not identical); a drawn SVG would replace it.
+12. **Renderer change:** the project now needs a Vulkan-capable GPU for smooth diagonals (older machines fall back to OpenGL with the lighter outline-based smoothing). Confirm this is acceptable for the target users.
+10. **Rotation cursor:** Godot has no rotation cursor; a generic cursor is used until a custom one is drawn.
+
+## 19. Implementation notes (kept in sync with the code)
+
+### 19.1 M1: Core as built
+
+**Model.** `Document` (project) → `Sheet` (`plan` | `unifilaire`) → `Entity` (`wall`, `opening`, `stair`, `grey_block`, `text`, `symbol`). Entities are `id + type + props`, where `props` is a JSON-shaped dictionary validated and normalised by `Schema` (property kinds: `int`, `float`, `string`, `bool`, `vec2i`, `points`, `string_array`, `enum:a|b`). Entity ids are unique document-wide; only plan sheets hold entities. A symbol's `index` of **0 means "no index assigned yet"**. The `cartouche`, `board` and `circuits` sections are free dictionaries until M3/M4 give them schemas; `config` has a schema (font family, base font size, default wall weight, provisoire mark).
+
+**Commands** (`CommandRegistry`; payloads are JSON primitives, all ids client-generated):
+
+| Type | Payload |
+|---|---|
+| `sheet.add` | `id, kind, props{name,…}, index?` |
+| `sheet.update` | `id, props{partial}` (kind is immutable; ghost references are checked) |
+| `sheet.remove` | `id` (also removes its entities and its references in other sheets' ghost lists) |
+| `sheet.move` | `id, index` (tab order) |
+| `entity.add` | `sheet, items[{id,type,props}]` (all-or-nothing) |
+| `entity.update` | `sheet, items[{id,props{partial}}]` |
+| `entity.remove` | `sheet, ids[]` |
+| `entity.move` | `sheet, ids[], delta[dx,dy]` (integer mm, y up) |
+| `doc.set` / `doc.unset` | `section, key, value` (`config` is schema-checked and cannot be unset) |
+| `patch.apply` | `ops[]` (how undo and redo travel; ARCH-5) |
+
+**Patches.** A handler is a pure function `(document, payload) → BuildResult` producing primitive operations (`entity`, `sheet`, `sheet_order`, `value`), each with its `before` and `after` state. `PatchApplier` is the only code that mutates a document: it checks every `before` (a stale undo or a conflicting edit is refused), applies atomically and rolls back on failure. The inverse of a patch is mechanical (reverse order, swap before/after).
+
+**Resolver and channel.** `Resolver.submit()` rejects unknown types and re-used command ids, applies, numbers (`seq`) and emits `committed(patch)`. `CommandChannel` is the interface; `InProcessChannel` is the v0.1 implementation.
+
+**Session and history.** `Session` (one user's client) owns an `IdGenerator`, a channel and a `History`. `run([commands])` is one undo step (one transaction id) and rolls back if a later command fails; `undo()`/`redo()` send `patch.apply` commands through the channel. No-op commands (empty patches) are accepted but not recorded. Selection, viewport, active circuit and circuit focus are not part of the Session's document state (ARCH-7).
+
+**File.** `DocumentIO` + `JsonWriter` produce `*.giroflee`: sorted keys, two-space indent, scalar arrays such as `[x, y]` on one line, floats lossless, entities sorted by id, sheets in tab order, trailing newline. Loading is **strict**: unknown keys, unknown properties, bad values, duplicate ids, entities on a non-plan sheet and dangling ghost references are errors (nothing is silently dropped). `format_version` is 1; `Migrations` upgrades older files step by step and refuses newer ones.
+
+**CLI.** `run-script <script.json> [--project <file>] [--out <file>] [--print]` applies a script (`{"format_version":1,"commands":[…]}`) through the same resolver as the GUI. Commands without an id get `script-<n>`.
+
+### 19.2 Tests added with M1 (TEST-1, TEST-2)
+- Unit tests for schema, migrations, id generator, JSON writer, document I/O, each command family, patches/applier, resolver, session/history, CLI.
+- **Scenario + golden:** `tests/scenarios/basic_floor.json` run through the CLI must reproduce `tests/golden/basic_floor.giroflee` byte for byte; every golden file must reload and re-save unchanged. Regenerate with `tools/regen-golden.sh`, then review the diff.
+- **Property tests:** seeded random command sequences (8 seeds × 80 steps) must (a) keep the document consistent after every step, (b) undo back through every intermediate state byte for byte and redo forward again, (c) be deterministic, (d) round-trip through save/load at every state.
+- `tests/unit/test_scripts_load.gd` fails if any script under `src/` does not parse under the strict typing rules.
+
+### 19.3 Conventions learned the hard way
+- Strict typing rejects `int()`, `bool()`, `float()` applied to a `Variant`; read values into typed locals instead (see `JsonUtil`).
+- Test scripts may use `@warning_ignore_start("unsafe_call_argument")`: GUT's `assert_*` functions take untyped arguments, and passing a dictionary lookup to them is otherwise an error.
+- After adding a script with a new `class_name`, refresh the class cache with `godot --headless --path . --import` (`tools/run-tests.sh` and `tools/regen-golden.sh` do it).
+- Files in `tests/` whose name starts with `test_` are collected by GUT; helpers use another prefix (`tests/support/kit_helpers.gd`).
+
+### 19.4 M2: canvas and plan editing as built
+
+**Layers (all new code is typed GDScript under `src/`):**
+
+| Folder | Contents |
+|---|---|
+| `src/core/render/` | `PlanTheme` (style tokens), `DrawOp` / `DrawList`, `EntityGeometry` (shapes, bounds, distances), `FrameBuilder` (border frame), `PlanRenderer` (sheet to DrawList), `ViewTransform` |
+| `src/core/geometry/` | `SnapEngine`, `WallLocator`, `HitTest`, `SpatialIndex`, `EntityMover` (translate, exact 90° rotation, flips) |
+| `src/editor/` | `EditorModel` (all user-level actions, no widgets), `EditorInput` (key and mouse routing), tools (`select`, `wall`, `opening`, `stair`, `block`, `text`), `Clipboard`, `EditorCommands` + `Fuzzy` (palette) |
+| `src/ui/` | `EditorWindow`, `CanvasView`, `PropertiesPanel`, `PaletteOverlay`, `ProjectFiles` (autosave), `main.gd` |
+
+**Rendering.** `PlanRenderer.build(document, sheet)` returns a `DrawList` in world mm with y up (ARCH-12); `CanvasView` flips y and draws it, and the SVG/PDF/PNG backends will consume the same list. Draw order: ghost sheets, frame, grey blocks, stairs, openings, walls, labels, étage title. Live previews of drags and handle edits use `options.overrides` (entity properties drawn instead of the stored ones), so nothing is committed until the gesture ends and a gesture is one undo step. The dot grid, page background, A4/A3 hints, selection and snap marker are screen decorations and are not part of the DrawList.
+
+**Page and frame** (since M2b the frame, title position, ghost switch and hints are project settings, see 19.5). The page occupies [0, W·scale] × [0, H·scale] in world mm with its origin at the bottom-left; the étage title position is stored in page mm from the top-left (`title_pos_mm`, default [366, 34] as in the reference plans). The frame has a column band (numbers) and a row band (letters); a count of 0 removes that band; 0 and 0 removes the frame. 44 mm at the bottom of the page is reserved for the cartouche (M4).
+
+**Geometry conventions.**
+- **Wall**: stroke weight in page mm converted with the sheet scale; mitred corners. A closed ring is drawn as two overlapping open halves meeting in the middle of two segments (offsetting a closed outline returns a hole that a polygon fill cannot show).
+- **Opening**: `pos` is the hinge (door) or the start (window) along the opening's local x axis; rotation is counter-clockwise; a door swings toward local +y and `flip_h` / `flip_v` mirror it (the hinge side is the flip, there is no `hinge` property: DRY). A window is a rectangle `OPENING_THICKNESS` (8.4 mm of page) thick centred on the wall line. Near a wall (28 px) an opening aligns with it, is centred on the cursor in 50 mm steps, swings toward the cursor's side, and records `host_wall` + `host_offset_mm`. Moving a wall moves its hosted openings (the `entity.move` command does it, so it is one undo step); removing a wall frees them (`host_wall` = "").
+- **Stair**: `pos` is the origin corner; width along local x, `steps × tread` along local y; drawn as an outline plus step lines.
+- **Grey block**: `pos` is the lower-left corner, `size` is [w, h]; handles on the four corners when it is not rotated.
+- **Text**: `pos` is the baseline start; size in paper points (project size × role factor, or the node's own `size_pt`); colour by role.
+
+**Interaction as built** (keys approved in section 7 unless marked ASSUMED, see section 18):
+- Tools `W D F E S T`, `Esc` (cancel, then select tool, then clear selection), `H` `V` flip and `R` / `Shift+R` rotate (the placement ghost while a placement tool is active, the selection otherwise), `Ctrl+Z/Y/C/X/V/D`, `Ctrl+T/Tab/Shift+Tab/N/P`, `F2`.
+- Select tool: click, Shift+click, box (touching entities), drag to move with snapping, double-click a text to edit it; vertex handles on a selected wall (a closed loop stays closed), corner handles on a grey block.
+- Wall tool: click adds a point (orthogonal to the previous one unless Shift), double-click or Enter finishes (ASSUMED), clicking the first point closes the loop, Backspace removes the last point (ASSUMED), Esc abandons.
+- Pan and zoom: wheel pans vertically, Shift+wheel horizontally, Ctrl+wheel zooms around the cursor (factor 1.15 per notch, 60 px pan per notch: ASSUMED values), Space+drag and middle-drag pan. The initial view fits the page and keeps following the viewport size until the user pans or zooms.
+- ASSUMED conventional keys named by FR-EDIT-1: `Delete` / `Backspace` deletes the selection, `Ctrl+A` selects all, arrow keys nudge by one grid step.
+- Copy / paste uses the system clipboard (text with a `giroflee/1` header): ids are regenerated, hosted openings keep following a copied wall, a link to something not copied is dropped, pasted symbols get index 0 until M3. Paste lands on the cursor snapped to the grid; `Ctrl+D` duplicates offset by two grid steps without touching the clipboard.
+- Étages: `Ctrl+T` creates one after the active tab (it inherits paper, scale, frame and grid settings; name "Étage", "Étage 2"…), palette commands duplicate (architecture and texts, optionally with symbols), delete (never the last one), rename (`F2` or double-click on the tab), ghost view (defaults to the étage just below, off by default), A4/A3 hints.
+- Properties panel: generated from the schemas. With nothing selected: étage settings and project settings (font family, base size, wall weight, PROVISOIRE mark); with a selection: that entity's properties (several of the same type are edited together). A change made in the panel does not rebuild the panel around the user.
+- Command palette (`Ctrl+P`): fuzzy search, French titles, shortcuts shown; also lists the file commands ("Ouvrir un projet…", "Enregistrer", "Enregistrer sous…", "Nouveau projet (nouvelle fenêtre)").
+
+**Files and windows.** One project per window. Autosave to `user://autosave/slot_<n>.giroflee` every 15 s when the document changed and on close; a window started without arguments silently recovers its slot's autosave. Launch arguments after `--`: `--open <file>`, `--slot=<n>`, `--new`. "Ouvrir" opens in this window only if it is still empty, otherwise in a new window, so nothing is replaced behind the user's back. `Ctrl+N` starts another instance with a free slot. There is no key for save/open yet (pending, section 18).
+
+**Performance** (2000 entities on one étage, measured by `test_performance.gd`): full DrawList rebuild about 50 ms, spatial index rebuild about 40 ms (both only after a document change), picking 0.2 ms, snapping about 1 ms (a linear scan took 35 ms). During a drag the DrawList is rebuilt per mouse move (about 50 ms at 2000 entities, much less on a real domestic plan); incremental rebuilding is a later optimisation.
+
+**Not in M2 (by design).** Electric symbols, circuits and indices (M3); the cartouche (M4); bundled fonts (M7, the engine's default font is used now); resizing of stairs and openings by handles (use the panel); re-attaching a hosted opening when its wall's vertices are edited.
+
+### 19.5 M2b: test feedback and look, as built
+
+**Feedback and what was done**
+
+| Feedback | Result |
+|---|---|
+| "The wall should look like a wall as soon as I start; the blue lines were confusing" (read as FR-PREV-1, see section 18) | Wall, block, opening and stair previews are the finished objects themselves (same code, same colours); the length readout is neutral grey. Test: the preview's polygons equal the committed wall's. |
+| Resize and rotate with handles like Affinity | `TransformBox` + `SelectionTransform` (Core) and the select tool: 8 resize handles and a rotation handle, Shift = proportional / 15° steps, Alt = from the centre, live preview, one undo step. The grey block's own corner handles were removed (the box replaces them); a single wall keeps its vertex handles. |
+| Diagonal polylines look bad | Measured, see below: Vulkan "Mobile" renderer with 4x 2D multisampling. |
+| Some options global, shared between sheets | Frame (columns, rows), étage-title position, ghost on/off and A4/A3 hints are project `config`; format 2 migrates old files; menu bar added. |
+| Tool buttons at the side, icons only with tooltips and hot keys | `ToolPalette` (left of the canvas), SVG icon set, visible by default, hide/show in the Affichage menu, remembered in `user://prefs.json`. |
+| Light Latte theme, no dark mode | `AppTheme` (Catppuccin Latte tokens), applied to the whole window; the engine clear colour is Latte mantle too. |
+| Icon for the window, and the splash next to the Godot logo | Logo as SVG (two variants), generated PNG / ICO / splash, `config/icon` and `boot_splash` set. |
+
+**Antialiasing spike (FR-RENDER-2).** Facts measured on screenshots of walls at 10°, 20°, 30°, 45°, 60°, an acute corner and a closed triangle:
+1. The OpenGL Compatibility renderer prints "2D MSAA is not yet supported for GLES3": no setting can smooth polygons there (pure fill: visibly stair-stepped).
+2. A feathered 1 px outline around each filled polygon smooths the edge on Compatibility but makes shapes about 1 px heavier; insetting the fill by 0.5 px to compensate looked grainy. It is kept only as the **fallback** (`CanvasView.aa_edges`, on when the renderer is Compatibility).
+3. The Vulkan **Mobile** renderer with `msaa_2d` = 4x gives perfectly smooth edges and mitres at every angle, with no custom code and no plugin. Chosen: `rendering_method = "mobile"`, `anti_aliasing/quality/msaa_2d = 2`, `rendering_device/fallback_to_opengl3 = true` (machines without Vulkan still start, with the outline fallback), clear colour = Latte mantle.
+4. Dot-grid dots are drawn as whole-pixel squares so they stay crisp under multisampling.
+No third-party plugin was needed. `tests/visual/test_antialiasing.gd` (opt-in, needs a display) counts feathered edge pixels along walls at many angles.
+
+**Project-wide settings (FR-PROJ-1, format 2).** `config` gained `frame_cols` (0 to 60), `frame_rows` (0 to 26), `title_pos_mm`, `ghost_on`, `hints`; the sheet kept paper, scale, grid step and `ghost_sheets`. `Migrations` upgrades format 1 (values of the first sheet, defaults when there is none). `RenderContext` carries the settings, `toggle_ghost` is one undo step. The menu check items and the panel read and write the same config keys, so they always agree.
+
+**Transform handles (FR-HANDLE).** `TransformBox.make(bounds, zoom)` lays out the handles 10 px outside the selection's *core* bounds (a wall's centre line, so scaling moves its points exactly with the cursor); `drag_scale` and `drag_rotation` are pure (a grab offset avoids any jump, factors never go below 0.02, rotation is in (-180, 180]). `SelectionTransform.scale` / `rotate` define what happens to each entity (walls: points; block: size along its own axes; opening: width; stair: width and tread; text: font size; symbols: position only; hosted openings follow without resizing). Box handles are hit within 7 px, wall vertex handles within 10 px (vertex first). The cursor follows `EditorModel.hover_handle`.
+
+**Menu bar (FR-MENU).** `MenuBar` with five `PopupMenu`s built from data (`EditorWindow._build_menus`). Shortcuts appear in the item text only for approved keys; the items carry **no Shortcut resource**, because a MenuBar registers its shortcuts globally and they would fire in addition to `EditorInput`. Check items refresh when a menu opens and after each action. "Réglages du projet" selects nothing and shows the Projet section of the Properties panel.
+
+**Tool bar and icons.** `ToolPalette` (one toggle `Button` per tool in a `ButtonGroup`, no focus so keys never land on a button) follows `EditorModel.tool_name`. `IconLibrary` rasterises `assets/icons/*.svg` (24 x 24 grid, ink `#4c4f69` and accent `#1e66f5`) at the requested size and caches the textures; the raw SVG files are included in the export (`include_filter`). `UserPrefs` stores `toolbar_visible` in `user://prefs.json`.
+
+**Branding.** `assets/branding/logo.svg` (with veins) and `logo_small.svg` (no veins, thicker outline, for 16 to 48 px) are a first hand-built vector approximation of the supplied raster mark; replace them with a drawn vector if one exists and run `godot --headless --path . -s tools/make_branding.gd` to regenerate `icon.png`, `icon.ico` (16 to 256 px) and `splash.png`. The splash shows the mark above the Godot logo (`godot_logo.svg`, CC BY 4.0, licence text and NOTICE entry included). Tests render the logo at 256 px and 32 px and check the yellow, green and outline colours, the alternation of the petals, the ICO structure and the splash.
+
+**Known limits.** The Windows executable keeps the default icon (embedding needs `rcedit`, section 18); the engine's default font is still used (M7); the rotation handle uses a generic cursor.
+

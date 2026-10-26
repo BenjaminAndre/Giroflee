@@ -23,6 +23,11 @@ static func set_value(doc: Document, payload: Dictionary) -> BuildResult:
 		if not JsonUtil.flag(coerced, "ok"):
 			return BuildResult.fail("config.%s: %s" % [key, str(coerced["error"])])
 		value = coerced["value"]
+		var merged: Dictionary = doc.config.duplicate()
+		merged[key] = value
+		var problem: String = Schema.check_config(merged)
+		if not problem.is_empty():
+			return BuildResult.fail("config.%s: %s" % [key, problem])
 	elif value == null or not JsonUtil.is_json_value(value):
 		return BuildResult.fail("value must be a JSON value (not null)")
 	var section: Dictionary = doc.section(section_name)

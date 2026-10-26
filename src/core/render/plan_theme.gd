@@ -10,6 +10,8 @@ const GREEN: Color = Color(31.0 / 255.0, 182.0 / 255.0, 114.0 / 255.0)
 const GREY_FILL: Color = Color(202.0 / 255.0, 202.0 / 255.0, 202.0 / 255.0, 0.9)
 const GHOST: Color = Color(0.72, 0.72, 0.72)
 const GHOST_FILL: Color = Color(0.85, 0.85, 0.85, 0.5)
+## Neutral colour of live readouts (lengths while drawing); deliberately not a wall colour.
+const PREVIEW_TEXT: Color = Color(108.0 / 255.0, 111.0 / 255.0, 133.0 / 255.0)
 const DOT: Color = Color(154.0 / 255.0, 154.0 / 255.0, 154.0 / 255.0)
 
 const PT_TO_MM: float = 25.4 / 72.0

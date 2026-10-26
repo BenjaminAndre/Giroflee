@@ -4,15 +4,22 @@ extends Control
 ## workspace, page, dot grid, A4/A3 hints, selection and tool previews, and forwards pointer
 ## input to the EditorInput. All geometry lives in world mm; this class only maps it to pixels.
 
-const WORKSPACE: Color = Color(0.72, 0.74, 0.77)
+const WORKSPACE: Color = AppTheme.CRUST
 const PAGE_SHADOW: Color = Color(0.0, 0.0, 0.0, 0.18)
-const SELECTION: Color = Color(0.1, 0.46, 0.82)
+const SELECTION: Color = Color(0.118, 0.4, 0.961)
 const HINT: Color = Color(0.35, 0.45, 0.62, 0.8)
 const MIN_DOT_SPACING_PX: float = 8.0
 
 var model: EditorModel
 var input: EditorInput
 var font: Font = ThemeDB.fallback_font
+
+## The Vulkan "Mobile" renderer multisamples 2D (project setting msaa_2d), which is what makes
+## diagonal walls smooth. The OpenGL Compatibility renderer cannot, so there (fallback for
+## machines without Vulkan) every filled polygon gets a feathered one-pixel outline instead.
+var aa_edges: bool = RenderingServer.get_current_rendering_method() == "gl_compatibility"
+## The dot grid is a screen decoration; tests switch it off to measure edges.
+var show_grid: bool = true
 
 var _cached_list: DrawList = null
 var _cached_revision: int = -1
@@ -58,7 +65,7 @@ func _draw() -> void:
 	_draw_page(view)
 	_draw_list(_sheet_list(), view, 1.0)
 	_draw_selection(view)
-	_draw_list(model.preview_list(), view, 0.85)
+	_draw_list(model.preview_list(), view, 1.0)
 	_draw_snap_marker(view)
 	if model.tool.has_overlay_rect():
 		_draw_box(view, model.tool.overlay_rect())
@@ -76,13 +83,15 @@ func _draw_page(view: ViewTransform) -> void:
 	draw_rect(Rect2(rect.position + Vector2(4, 4), rect.size), PAGE_SHADOW)
 	draw_rect(rect, Color.WHITE)
 	_draw_grid(view, sheet, page)
-	var hints: bool = sheet.props["hints"]
+	var hints: bool = model.doc().config["hints"]
 	if hints:
 		_draw_hint(view, sheet, 297.0, 210.0, "A4")
 		_draw_hint(view, sheet, 420.0, 297.0, "A3")
 
 
 func _draw_grid(view: ViewTransform, sheet: Sheet, page: Rect2) -> void:
+	if not show_grid:
+		return
 	var step_value: int = sheet.props["grid_step_mm"]
 	var step: float = float(step_value)
 	var factor: float = 1.0
@@ -98,8 +107,9 @@ func _draw_grid(view: ViewTransform, sheet: Sheet, page: Rect2) -> void:
 	while x <= visible.end.x:
 		var y: float = y0
 		while y <= visible.end.y:
-			var p: Vector2 = view.world_to_screen(Vector2(x, y))
-			draw_rect(Rect2(p - Vector2(0.75, 0.75), Vector2(1.5, 1.5)), PlanTheme.DOT)
+			var p: Vector2 = view.world_to_screen(Vector2(x, y)).round()
+			# whole-pixel squares stay crisp even with multisampling
+			draw_rect(Rect2(p - Vector2(1.0, 1.0), Vector2(2.0, 2.0)), PlanTheme.DOT)
 			y += step
 		x += step
 
@@ -155,8 +165,13 @@ func _draw_polygon_op(op: DrawOp, view: ViewTransform, alpha: float) -> void:
 	var screen: PackedVector2Array = _to_screen(op.points, view)
 	var fill: Color = op.fill
 	fill.a *= alpha
-	if fill.a > 0.0 and _polygon_area(screen) > 0.05:
-		draw_colored_polygon(screen, fill)
+	if fill.a <= 0.0 or _polygon_area(screen) <= 0.05:
+		return
+	draw_colored_polygon(screen, fill)
+	if aa_edges:
+		var outline: PackedVector2Array = screen.duplicate()
+		outline.append(screen[0])
+		draw_polyline(outline, fill, 1.0, true)
 
 
 func _draw_polyline_op(op: DrawOp, view: ViewTransform, alpha: float) -> void:
@@ -205,25 +220,70 @@ static func _polygon_area(points: PackedVector2Array) -> float:
 
 func _draw_selection(view: ViewTransform) -> void:
 	var context: RenderContext = model.ctx()
-	for entity: Entity in model.selected_entities():
-		var bounds: Rect2 = EntityGeometry.bounds(entity, context)
-		_draw_box(view, bounds.grow(6.0 / view.zoom), entity.type != "wall")
-	if model.tool_name == "select":
-		for handle: Dictionary in SelectTool.handles_for(model):
-			var pos: Vector2 = handle["pos"]
-			var p: Vector2 = view.world_to_screen(pos)
-			var box: Rect2 = Rect2(p - Vector2(4.5, 4.5), Vector2(9, 9))
-			draw_rect(box, Color.WHITE)
-			draw_rect(box, SELECTION, false, 1.5)
+	var entities: Array[Entity] = model.selected_entities()
+	if entities.size() > 1:
+		for entity: Entity in entities:
+			_draw_box(view, EntityGeometry.bounds(entity, context).grow(4.0 / view.zoom), false, 0.5)
+	if model.tool_name != "select":
+		return
+	var box: TransformBox = SelectTool.box_for(model)
+	if box != null:
+		_draw_transform_box(view, box)
+	for handle: Dictionary in SelectTool.handles_for(model):
+		var pos: Vector2 = handle["pos"]
+		_draw_handle_square(view.world_to_screen(pos))
+	_update_cursor()
 
 
-func _draw_box(view: ViewTransform, world_rect: Rect2, tint: bool = true) -> void:
+## Affinity-style box: eight resize handles and a rotation handle on a stem above it.
+func _draw_transform_box(view: ViewTransform, box: TransformBox) -> void:
+	var a: Vector2 = view.world_to_screen(Vector2(box.box.position.x, box.box.end.y))
+	var b: Vector2 = view.world_to_screen(Vector2(box.box.end.x, box.box.position.y))
+	draw_rect(Rect2(a, b - a).abs(), SELECTION, false, 1.0)
+	var top_middle: Vector2 = view.world_to_screen(box.handle_pos("n"))
+	for handle: Dictionary in box.handles:
+		var id: String = handle["id"]
+		var pos: Vector2 = handle["pos"]
+		var p: Vector2 = view.world_to_screen(pos)
+		if id == "rotate":
+			draw_line(top_middle, p, SELECTION, 1.0)
+			draw_circle(p, 5.5, Color.WHITE)
+			draw_arc(p, 5.5, 0.0, TAU, 20, SELECTION, 1.5, true)
+		else:
+			_draw_handle_square(p)
+
+
+func _draw_handle_square(p: Vector2) -> void:
+	var square: Rect2 = Rect2(p - Vector2(4.5, 4.5), Vector2(9, 9))
+	draw_rect(square, Color.WHITE)
+	draw_rect(square, SELECTION, false, 1.5)
+
+
+func _update_cursor() -> void:
+	match model.hover_handle:
+		"nw", "se":
+			mouse_default_cursor_shape = Control.CURSOR_FDIAGSIZE
+		"ne", "sw":
+			mouse_default_cursor_shape = Control.CURSOR_BDIAGSIZE
+		"n", "s":
+			mouse_default_cursor_shape = Control.CURSOR_VSIZE
+		"e", "w":
+			mouse_default_cursor_shape = Control.CURSOR_HSIZE
+		"rotate":
+			mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		"vertex":
+			mouse_default_cursor_shape = Control.CURSOR_MOVE
+		_:
+			mouse_default_cursor_shape = Control.CURSOR_ARROW
+
+
+func _draw_box(view: ViewTransform, world_rect: Rect2, tint: bool = true, line_width: float = 1.2) -> void:
 	var a: Vector2 = view.world_to_screen(Vector2(world_rect.position.x, world_rect.end.y))
 	var b: Vector2 = view.world_to_screen(Vector2(world_rect.end.x, world_rect.position.y))
 	var rect: Rect2 = Rect2(a, b - a).abs()
 	if tint:
 		draw_rect(rect, Color(SELECTION.r, SELECTION.g, SELECTION.b, 0.08))
-	draw_rect(rect, SELECTION, false, 1.2)
+	draw_rect(rect, SELECTION, false, line_width)
 
 
 func _draw_snap_marker(view: ViewTransform) -> void:

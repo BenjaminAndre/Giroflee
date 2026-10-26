@@ -39,7 +39,7 @@ static func build(model: EditorModel) -> Array[Entry]:
 	list.append(Entry.new("edit.duplicate", "Dupliquer la sélection", "Ctrl+D", model.duplicate_selection))
 	list.append(Entry.new("edit.delete", "Supprimer la sélection", "Suppr", model.delete_selection))
 	list.append(Entry.new("edit.select_all", "Tout sélectionner", "Ctrl+A", model.select_all))
-	list.append(Entry.new("edit.snap", "Activer ou désactiver l'accrochage", "", _toggle_snap.bind(model)))
+	list.append(Entry.new("edit.snap", "Activer ou désactiver l'accrochage", "", toggle_snap.bind(model)))
 	list.append(Entry.new("tool.select", "Outil de sélection", "Échap", model.set_tool.bind("select")))
 	list.append(Entry.new("tool.wall", "Outil mur", "W", model.set_tool.bind("wall")))
 	list.append(Entry.new("tool.door", "Outil porte", "D", model.set_tool.bind("door")))
@@ -63,7 +63,7 @@ static func search(entries: Array[Entry], query: String) -> Array[int]:
 	return Fuzzy.rank(query, titles)
 
 
-static func _toggle_snap(model: EditorModel) -> void:
+static func toggle_snap(model: EditorModel) -> void:
 	model.snap_enabled = not model.snap_enabled
 	model.notice.emit("Accrochage activé" if model.snap_enabled else "Accrochage désactivé")
 	model.changed.emit()

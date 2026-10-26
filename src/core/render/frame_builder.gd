@@ -29,8 +29,8 @@ static func row_label(index: int) -> String:
 
 
 static func build(sheet: Sheet, ctx: RenderContext, out: DrawList) -> void:
-	var cols: int = sheet.props["frame_cols"]
-	var rows: int = sheet.props["frame_rows"]
+	var cols: int = ctx.frame_cols
+	var rows: int = ctx.frame_rows
 	if cols == 0 and rows == 0:
 		return
 	var paper_w: int = sheet.props["paper_w_mm"]

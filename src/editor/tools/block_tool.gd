@@ -61,9 +61,9 @@ func preview(model: EditorModel) -> DrawList:
 	var corners: PackedVector2Array = PackedVector2Array([
 		rect.position, Vector2(rect.end.x, rect.position.y), rect.end, Vector2(rect.position.x, rect.end.y),
 	])
-	list.add(DrawOp.polygon(corners, Color(0.8, 0.8, 0.8, 0.6), "preview"))
+	list.add(DrawOp.polygon(corners, PlanTheme.GREY_FILL, "blocks"))
 	var size: float = 13.0 / model.view().zoom
-	var readout: DrawOp = DrawOp.label("%s × %s" % [Fmt.length(rect.size.x), Fmt.length(rect.size.y)], rect.get_center(), size, PlanTheme.BLUE, "preview")
+	var readout: DrawOp = DrawOp.label("%s × %s" % [Fmt.length(rect.size.x), Fmt.length(rect.size.y)], rect.get_center(), size, PlanTheme.PREVIEW_TEXT, "preview")
 	readout.anchor = "center"
 	list.add(readout)
 	return list

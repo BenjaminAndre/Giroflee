@@ -14,8 +14,11 @@ static func create(test: GutTest, document: Document = null) -> UiHarness:
 	var harness: UiHarness = UiHarness.new()
 	harness.window = EditorWindow.new()
 	harness.window.slot = 98
-	test.add_child_autofree(harness.window)
-	harness.window.size = Vector2(1600, 900)
+	# the window fills its parent (full-rect anchors), so give it a parent of the right size
+	var host: Control = Control.new()
+	host.size = Vector2(1600, 900)
+	test.add_child_autofree(host)
+	host.add_child(harness.window)
 	harness.window.open_document(document, "")
 	await test.get_tree().process_frame
 	await test.get_tree().process_frame

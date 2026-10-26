@@ -73,12 +73,7 @@ const SHEET_SPEC: Dictionary = {
 	"paper_w_mm": {"kind": "int", "default": 420},
 	"paper_h_mm": {"kind": "int", "default": 297},
 	"scale_den": {"kind": "int", "default": 50},
-	"frame_cols": {"kind": "int", "default": 17},
-	"frame_rows": {"kind": "int", "default": 8},
 	"grid_step_mm": {"kind": "int", "default": 100},
-	"hints": {"kind": "bool", "default": true},
-	"title_pos_mm": {"kind": "vec2i", "default": [366, 34]},
-	"ghost_on": {"kind": "bool", "default": false},
 	"ghost_sheets": {"kind": "string_array", "default": []},
 }
 
@@ -87,7 +82,16 @@ const CONFIG_SPEC: Dictionary = {
 	"font_size_pt": {"kind": "float", "default": 10.0},
 	"wall_weight_mm": {"kind": "float", "default": 1.4},
 	"provisoire_mark": {"kind": "bool", "default": true},
+	# display settings shared by every étage (SRD FR-PROJ-1)
+	"frame_cols": {"kind": "int", "default": 17},
+	"frame_rows": {"kind": "int", "default": 8},
+	"title_pos_mm": {"kind": "vec2i", "default": [366, 34]},
+	"ghost_on": {"kind": "bool", "default": false},
+	"hints": {"kind": "bool", "default": true},
 }
+
+## Settings that used to be per sheet (format 1) and are project-wide since format 2.
+const MOVED_TO_CONFIG: PackedStringArray = ["frame_cols", "frame_rows", "title_pos_mm", "ghost_on", "hints"]
 
 ## Document sections without a schema yet (they get one in later milestones).
 const FREE_SECTIONS: PackedStringArray = ["cartouche", "board", "circuits"]
@@ -234,10 +238,21 @@ static func check_sheet(props: Dictionary) -> String:
 		var value: int = props[key]
 		if value <= 0:
 			return "%s must be positive" % key
-	for key: String in ["frame_cols", "frame_rows"]:
-		var count: int = props[key]
-		if count < 0:
-			return "%s must not be negative" % key
+	return ""
+
+
+## Cross-property rules for a complete project config. Returns "" when valid.
+static func check_config(config: Dictionary) -> String:
+	var cols: int = config["frame_cols"]
+	var rows: int = config["frame_rows"]
+	if cols < 0 or cols > 60:
+		return "frame_cols must be between 0 and 60"
+	if rows < 0 or rows > 26:
+		return "frame_rows must be between 0 and 26 (rows are lettered A to Z)"
+	var size: float = config["font_size_pt"]
+	var weight: float = config["wall_weight_mm"]
+	if size <= 0.0 or weight <= 0.0:
+		return "font_size_pt and wall_weight_mm must be positive"
 	return ""
 
 

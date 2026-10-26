@@ -13,6 +13,8 @@ var project_path: String = ""
 var model: EditorModel
 var input: EditorInput
 
+var menu_bar: MenuBar
+var toolbar: ToolPalette
 var canvas: CanvasView
 var panel: PropertiesPanel
 var palette: PaletteOverlay
@@ -30,13 +32,22 @@ var _autosaved_revision: int = 0
 var _notice_left: float = 0.0
 var _notice_text: String = ""
 var _autosave_timer: Timer
+## Menu title -> PopupMenu, and menu title -> {item id: {"do": Callable, "state": Callable?}}.
+var _menus: Dictionary = {}
+var _menu_items: Dictionary = {}
 
 
 func _init() -> void:
+	theme = AppTheme.build()
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	var root: VBoxContainer = VBoxContainer.new()
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.add_theme_constant_override("separation", 0)
 	add_child(root)
+
+	menu_bar = MenuBar.new()
+	menu_bar.prefer_global_menu = false
+	root.add_child(menu_bar)
 
 	var top: HBoxContainer = HBoxContainer.new()
 	root.add_child(top)
@@ -56,21 +67,34 @@ func _init() -> void:
 	var split: HSplitContainer = HSplitContainer.new()
 	split.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root.add_child(split)
+	var work: HBoxContainer = HBoxContainer.new()
+	work.add_theme_constant_override("separation", 0)
+	work.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	split.add_child(work)
+	toolbar = ToolPalette.new()
+	var prefs: Dictionary = UserPrefs.load_prefs()
+	var show_toolbar: bool = prefs["toolbar_visible"]
+	toolbar.visible = show_toolbar
+	work.add_child(toolbar)
 	canvas = CanvasView.new()
 	canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	split.add_child(canvas)
+	work.add_child(canvas)
 	panel = PropertiesPanel.new()
 	split.add_child(panel)
 
+	var status_bar: PanelContainer = PanelContainer.new()
+	status_bar.theme_type_variation = "ToolPanel"
+	root.add_child(status_bar)
 	var bottom: HBoxContainer = HBoxContainer.new()
-	root.add_child(bottom)
+	status_bar.add_child(bottom)
 	status_hint = Label.new()
 	status_hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	status_hint.clip_text = true
 	bottom.add_child(status_hint)
 	status_info = Label.new()
 	bottom.add_child(status_info)
+	_build_menus()
 
 	palette = PaletteOverlay.new()
 	palette.closed.connect(func() -> void: canvas.grab_focus())
@@ -119,6 +143,7 @@ func open_document(doc: Document, p_path: String = "") -> void:
 	input.new_window_requested.connect(new_window)
 	canvas.bind(model, input)
 	panel.bind(model)
+	toolbar.bind(model)
 	_saved_revision = model.revision
 	_autosaved_revision = model.revision
 	_sync_tabs()
@@ -211,6 +236,124 @@ func _pick_file(mode: DisplayServer.FileDialogMode, title: String, callback: Cal
 	dialog.file_selected.connect(func(_p: String) -> void: dialog.queue_free())
 	add_child(dialog)
 	dialog.popup_centered(Vector2i(800, 500))
+
+
+# --- menu bar -----------------------------------------------------------------------------
+
+
+## The PopupMenu of a top-level menu ("Fichier", "Édition", "Étage", "Affichage", "Projet").
+func menu(title: String) -> PopupMenu:
+	if _menus.has(title):
+		var popup: PopupMenu = _menus[title]
+		return popup
+	return null
+
+
+func set_toolbar_visible(shown: bool) -> void:
+	toolbar.visible = shown
+	UserPrefs.set_value("toolbar_visible", shown)
+
+
+func _build_menus() -> void:
+	# a shortcut is shown only when the author approved one (WA-1); it is text, not a binding,
+	# so the editor's own key handling stays the single place where keys are interpreted
+	_add_menu("Fichier", [
+		{"text": "Nouveau projet (nouvelle fenêtre)", "hint": "Ctrl+N", "do": func() -> void: new_window(PackedStringArray(["--new"]))},
+		{"text": "Ouvrir…", "do": func() -> void: open_project()},
+		{"text": "Enregistrer", "do": func() -> void: save()},
+		{"text": "Enregistrer sous…", "do": func() -> void: save_as()},
+	])
+	_add_menu("Édition", [
+		{"text": "Annuler", "hint": "Ctrl+Z", "do": func() -> void: model.undo()},
+		{"text": "Rétablir", "hint": "Ctrl+Y", "do": func() -> void: model.redo()},
+		{"separator": true},
+		{"text": "Couper", "hint": "Ctrl+X", "do": func() -> void: model.cut_selection()},
+		{"text": "Copier", "hint": "Ctrl+C", "do": func() -> void: model.copy_selection()},
+		{"text": "Coller", "hint": "Ctrl+V", "do": func() -> void: model.paste()},
+		{"text": "Dupliquer", "hint": "Ctrl+D", "do": func() -> void: model.duplicate_selection()},
+		{"text": "Supprimer", "do": func() -> void: model.delete_selection()},
+		{"text": "Tout sélectionner", "do": func() -> void: model.select_all()},
+	])
+	_add_menu("Étage", [
+		{"text": "Nouvel étage", "hint": "Ctrl+T", "do": func() -> void: model.new_sheet()},
+		{"text": "Dupliquer l'étage", "do": func() -> void: model.duplicate_sheet(false)},
+		{"text": "Dupliquer l'étage avec les symboles", "do": func() -> void: model.duplicate_sheet(true)},
+		{"text": "Renommer l'étage", "hint": "F2", "do": func() -> void: model.rename_requested.emit(model.active_sheet_id)},
+		{"text": "Supprimer l'étage", "do": func() -> void: model.delete_sheet()},
+	])
+	_add_menu("Affichage", [
+		{"text": "Étage fantôme", "do": func() -> void: model.toggle_ghost(), "state": func() -> bool: return _config_flag("ghost_on")},
+		{"text": "Repères A4 / A3", "do": func() -> void: model.toggle_hints(), "state": func() -> bool: return _config_flag("hints")},
+		{"text": "Accrochage", "do": func() -> void: EditorCommands.toggle_snap(model), "state": func() -> bool: return model.snap_enabled},
+		{"text": "Barre d'outils", "do": func() -> void: set_toolbar_visible(not toolbar.visible), "state": func() -> bool: return toolbar.visible},
+	])
+	_add_menu("Projet", [
+		{"text": "Réglages du projet", "do": func() -> void: show_project_settings()},
+	])
+
+
+## Shows the project-wide settings in the Properties panel (no popup window).
+func show_project_settings() -> void:
+	model.set_tool("select")
+	model.clear_selection()
+	panel.refresh()
+
+
+func _add_menu(title: String, items: Array) -> void:
+	var popup: PopupMenu = PopupMenu.new()
+	popup.name = title
+	menu_bar.add_child(popup)
+	_menus[title] = popup
+	var actions: Dictionary = {}
+	var next_id: int = 1
+	for item: Variant in items:
+		var entry: Dictionary = item
+		if entry.has("separator"):
+			popup.add_separator()
+			continue
+		var label: String = entry["text"]
+		var hint: String = entry.get("hint", "")
+		if not hint.is_empty():
+			label = "%s    %s" % [label, hint]
+		if entry.has("state"):
+			popup.add_check_item(label, next_id)
+		else:
+			popup.add_item(label, next_id)
+		actions[next_id] = entry
+		next_id += 1
+	_menu_items[title] = actions
+	popup.id_pressed.connect(_on_menu_pressed.bind(title))
+	popup.about_to_popup.connect(_refresh_menu.bind(title))
+
+
+func _config_flag(key: String) -> bool:
+	var value: bool = model.doc().config[key]
+	return value
+
+
+func _on_menu_pressed(id: int, title: String) -> void:
+	var actions: Dictionary = _menu_items[title]
+	if not actions.has(id) or model == null:
+		return
+	var entry: Dictionary = actions[id]
+	var action: Callable = entry["do"]
+	action.call()
+	_refresh_menu(title)
+
+
+## Check marks always show the current state.
+func _refresh_menu(title: String) -> void:
+	if model == null:
+		return
+	var popup: PopupMenu = _menus[title]
+	var actions: Dictionary = _menu_items[title]
+	for key: Variant in actions.keys():
+		var entry: Dictionary = actions[key]
+		if entry.has("state"):
+			var state: Callable = entry["state"]
+			var checked: bool = state.call()
+			var item_id: int = key
+			popup.set_item_checked(popup.get_item_index(item_id), checked)
 
 
 # --- palette ------------------------------------------------------------------------------

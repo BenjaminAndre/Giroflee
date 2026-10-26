@@ -94,3 +94,21 @@ func test_screenshot_ghost_view() -> void:
 	h.model().set_active_sheet(h.model().doc().sheet_order[1])
 	await _shot("ghost")
 	assert_true(true)
+
+
+func test_screenshot_transform_handles_and_wall_preview() -> void:
+	if DisplayServer.get_name() == "headless":
+		pending("needs a display")
+		return
+	_room()
+	await h.play(self)
+	h.model().set_selection(h.model().sheet().sorted_entity_ids().filter(func(id: String) -> bool: return h.model().sheet().entities[id].type in ["grey_block", "stair"]))
+	await _shot("transform_handles")
+	h.model().clear_selection()
+	h.key("W")
+	h.click(Vector2(13000, 3000))
+	h.click(Vector2(16000, 3000))
+	h.move(Vector2(16000, 6500))
+	await h.play(self)
+	await _shot("wall_preview")
+	assert_true(true)

@@ -4,7 +4,7 @@ extends Tool
 ## drag a selected entity to move the selection (with snapping), drag a handle to reshape a
 ## wall vertex or resize a grey block (SRD FR-EDIT-1). Each gesture is one undo step.
 
-enum Mode { IDLE, BOX, MOVE, HANDLE }
+enum Mode { IDLE, BOX, MOVE, HANDLE, TRANSFORM }
 
 var _mode: Mode = Mode.IDLE
 var _target_id: String = ""
@@ -15,6 +15,13 @@ var _box: Rect2 = Rect2()
 var _box_start: Vector2 = Vector2.ZERO
 var _handle: Dictionary = {}
 var _handle_props: Dictionary = {}
+# transform-box gesture (Affinity-style resize and rotation)
+var _t_handle: String = ""
+var _t_original: Rect2 = Rect2()
+var _t_grab: Vector2 = Vector2.ZERO
+var _t_entities: Array[Entity] = []
+var _t_followers: Array = []
+var _t_props: Dictionary = {}
 
 
 func tool_name() -> String:
@@ -25,8 +32,8 @@ func is_active() -> bool:
 	return _mode != Mode.IDLE
 
 
-## Handles shown for a single selected wall (its vertices) or grey block (its corners).
-## Each is {"pos": Vector2, "kind": "vertex"|"corner", "index": int, "entity": id}.
+## Vertex handles shown for a single selected wall. Each is {"pos": Vector2, "kind": "vertex",
+## "index": int, "entity": id}. Resizing and rotating go through the transform box instead.
 static func handles_for(model: EditorModel) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	if model.selection.size() != 1:
@@ -36,17 +43,18 @@ static func handles_for(model: EditorModel) -> Array[Dictionary]:
 		var points: Array = entity.props["points"]
 		for i: int in points.size():
 			out.append({"pos": EntityGeometry.vec(points[i]), "kind": "vertex", "index": i, "entity": entity.id})
-	elif entity.type == "grey_block":
-		var rotation: float = entity.props["rotation"]
-		if rotation == 0.0:
-			var corners: PackedVector2Array = EntityGeometry.block_polygon(entity.props)
-			for i: int in corners.size():
-				out.append({"pos": corners[i], "kind": "corner", "index": i, "entity": entity.id})
 	return out
 
 
+## The transform box around the current selection, or null when nothing is selected.
+static func box_for(model: EditorModel) -> TransformBox:
+	if model.selection.is_empty():
+		return null
+	return TransformBox.make(model.selection_bounds(true), model.view().zoom)
+
+
 func press(model: EditorModel, input: ToolInput) -> void:
-	var handle: Dictionary = _handle_at(model, input.world, input.tolerance * 1.4)
+	var handle: Dictionary = _handle_at(model, input.world, input.tolerance)
 	if not handle.is_empty():
 		_mode = Mode.HANDLE
 		_handle = handle
@@ -54,6 +62,12 @@ func press(model: EditorModel, input: ToolInput) -> void:
 		_handle_props = {}
 		model.changed.emit()
 		return
+	var box: TransformBox = SelectTool.box_for(model)
+	if box != null:
+		var box_handle: String = box.hit(input.world, input.tolerance * 0.7)
+		if not box_handle.is_empty():
+			_begin_transform(model, box, box_handle, input.world)
+			return
 	var picked: String = HitTest.pick(model.sheet(), model.ctx(), input.world, input.tolerance, [], model.spatial())
 	if not picked.is_empty():
 		if input.double_click:
@@ -92,6 +106,10 @@ func move(model: EditorModel, input: ToolInput) -> void:
 		Mode.HANDLE:
 			var at: Vector2 = model.snap(input.world, [_target_id]).pos
 			_handle_props = _props_with_handle(model, at)
+		Mode.TRANSFORM:
+			_update_transform(model, input)
+		Mode.IDLE:
+			model.hover_handle = _hover_handle(model, input)
 	model.changed.emit()
 
 
@@ -122,6 +140,9 @@ func release(model: EditorModel, input: ToolInput) -> void:
 				var diff: Dictionary = EditorModel._changed_props(entity.props, _handle_props)
 				if not diff.is_empty():
 					model.update_entities([{"id": _target_id, "props": diff}])
+	if finished == Mode.TRANSFORM:
+		model.apply_transform(_t_props)
+	_clear_transform()
 	_delta = Vector2i.ZERO
 	_handle = {}
 	_handle_props = {}
@@ -136,6 +157,7 @@ func cancel(model: EditorModel) -> bool:
 	_delta = Vector2i.ZERO
 	_handle = {}
 	_handle_props = {}
+	_clear_transform()
 	model.changed.emit()
 	return true
 
@@ -154,6 +176,8 @@ func overrides(model: EditorModel) -> Dictionary:
 				out[entity_id] = EntityMover.shifted_props(entity.type, entity.props, _delta.x, _delta.y)
 	elif _mode == Mode.HANDLE and not _handle_props.is_empty():
 		out[_target_id] = _handle_props
+	elif _mode == Mode.TRANSFORM:
+		return _t_props
 	return out
 
 
@@ -198,12 +222,60 @@ func _props_with_handle(model: EditorModel, at: Vector2) -> Dictionary:
 			points[last] = target
 		props["points"] = points
 		return props
-	# grey block: the opposite corner stays, the dragged one follows the cursor
-	var corners: PackedVector2Array = EntityGeometry.block_polygon(entity.props)
-	var opposite: Vector2 = corners[(index + 2) % 4]
-	var rect: Rect2 = Rect2(opposite, at - opposite).abs()
-	if rect.size.x < 1.0 or rect.size.y < 1.0:
-		return entity.props.duplicate(true)
-	props["pos"] = [roundi(rect.position.x), roundi(rect.position.y)]
-	props["size"] = [roundi(rect.size.x), roundi(rect.size.y)]
-	return props
+	return entity.props.duplicate(true)
+
+
+# --- transform box (resize and rotate handles) -------------------------------------------------
+
+
+func _begin_transform(model: EditorModel, box: TransformBox, handle_id: String, grab: Vector2) -> void:
+	_mode = Mode.TRANSFORM
+	_t_handle = handle_id
+	_t_original = box.original
+	_t_grab = grab
+	var expanded: Dictionary = SelectionTransform.with_followers(model.sheet(), model.selection)
+	_t_followers = expanded["followers"]
+	_t_entities = []
+	var ids: Array = expanded["ids"]
+	for raw_id: Variant in ids:
+		var entity_id: String = str(raw_id)
+		var entity: Entity = model.sheet().entities[entity_id]
+		_t_entities.append(entity)
+	_t_props = {}
+	model.changed.emit()
+
+
+func _update_transform(model: EditorModel, input: ToolInput) -> void:
+	var ctx: RenderContext = model.ctx()
+	if _t_handle == "rotate":
+		var pivot: Vector2 = _t_original.get_center()
+		var angle: float = TransformBox.drag_rotation(pivot, _t_grab, input.world, input.shift)
+		_t_props = SelectionTransform.rotate(_t_entities, pivot, angle)
+		return
+	# snap the point that the dragged handle stands for, then keep the grab offset
+	var moving: Vector2 = TransformBox.moving_point(_t_handle, _t_original)
+	var target: Vector2 = moving + (input.world - _t_grab)
+	var snapped: Vector2 = model.snap(target, model.selection).pos
+	var cursor: Vector2 = _t_grab + (snapped - moving)
+	var factors: Dictionary = TransformBox.drag_scale(_t_handle, _t_original, _t_grab, cursor, input.shift, input.alt)
+	var anchor: Vector2 = factors["anchor"]
+	var sx: float = factors["sx"]
+	var sy: float = factors["sy"]
+	_t_props = SelectionTransform.scale(_t_entities, ctx, anchor, sx, sy, _t_followers)
+
+
+func _clear_transform() -> void:
+	_t_handle = ""
+	_t_entities = []
+	_t_followers = []
+	_t_props = {}
+
+
+## Id of the handle under the pointer ("vertex" for a wall vertex), or "".
+func _hover_handle(model: EditorModel, input: ToolInput) -> String:
+	if not _handle_at(model, input.world, input.tolerance).is_empty():
+		return "vertex"
+	var box: TransformBox = SelectTool.box_for(model)
+	if box == null:
+		return ""
+	return box.hit(input.world, input.tolerance * 0.7)
