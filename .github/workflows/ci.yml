@@ -24,7 +24,7 @@ jobs:
       # Imports the project, runs the whole GUT suite headless, and fails if any script failed
       # to load (GUT alone would skip it silently).
       - name: Run tests
-        run: tools/run-tests.sh
+        run: bash tools/run-tests.sh
 
   release:
     needs: test
