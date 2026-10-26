@@ -1,0 +1,13 @@
+{
+  "format_version": 1,
+  "events": [
+    { "frame": 0, "type": "key", "key": "L", "pressed": true },
+    { "frame": 0, "type": "key", "key": "L", "pressed": false },
+    { "frame": 1, "type": "mouse_motion", "pos": [100, 80] },
+    { "frame": 2, "type": "mouse_button", "button": "left", "pressed": true, "pos": [100, 80] },
+    { "frame": 2, "type": "mouse_button", "button": "left", "pressed": false, "pos": [100, 80] },
+    { "frame": 3, "type": "key", "key": "C", "pressed": true },
+    { "frame": 3, "type": "key", "key": "H", "pressed": true, "mods": ["shift"] },
+    { "frame": 4, "type": "wheel", "direction": "up", "pos": [100, 80], "mods": ["ctrl"] }
+  ]
+}

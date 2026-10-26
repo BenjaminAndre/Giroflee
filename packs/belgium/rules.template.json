@@ -1,0 +1,77 @@
+{
+  "_help": "Template a remplir par l'auteur a partir du texte du RGIE. Toute valeur a null signifie 'regle non configuree': l'application n'applique pas la regle et la signale comme avertissement. 'source' = reference de l'article. Enregistrer sous le nom rules.json une fois rempli.",
+  "format_version": 1,
+  "pack": "belgium",
+
+  "max_points_per_circuit": {
+    "_help": "Nombre maximal de points (groupes circuit+indice) par circuit. Un depassement est un AVERTISSEMENT (derogations possibles).",
+    "value": null,
+    "severity": "warning",
+    "applies_to": "all_circuits",
+    "source": null
+  },
+
+  "point_counting": {
+    "_help": "Comment compter les points. Par defaut: un groupe (meme circuit, meme indice) = 1 point, quel que soit 'count'.",
+    "group_counts_as_one": true,
+    "source": null
+  },
+
+  "breaker_cable_pairs": {
+    "_help": "Couples (calibre disjoncteur, section cable) autorises. Liste de {breaker_a, section_mm2}. Un couple absent de la liste donne un AVERTISSEMENT.",
+    "allowed": [],
+    "severity": "warning",
+    "source": null
+  },
+
+  "differential_required": {
+    "_help": "Circuits ou locaux qui doivent etre derriere un differentiel 30 mA. Pour chaque entree: 'when' decrit la condition (type de symbole ou mot-cle de local), 'max_residual_current_ma' la valeur requise.",
+    "rules": [
+      {
+        "when": { "symbol_type": "socket" },
+        "max_residual_current_ma": null,
+        "source": null
+      },
+      {
+        "when": { "room_keywords_match": "bathroom" },
+        "max_residual_current_ma": null,
+        "source": null
+      }
+    ],
+    "severity": "warning"
+  },
+
+  "bathroom": {
+    "_help": "Verification de proximite (heuristique). Le plan n'est pas forcement a l'echelle: le message doit le rappeler. Distances en mm.",
+    "room_keywords": ["salle de bain", "salle d'eau", "douche", "sdb"],
+    "check_radius_mm": null,
+    "message_fr": "Verifier les volumes de la salle de bain (le plan n'est peut-etre pas a l'echelle).",
+    "severity": "warning",
+    "source": null
+  },
+
+  "circuit_defaults": {
+    "_help": "Valeurs appliquees quand l'utilisateur n'a rien saisi (signalees comme 'valeur par defaut' dans le rapport). Facultatif: laisser null pour ne rien appliquer.",
+    "breaker": { "rating_a": null, "curve": null, "breaking_capacity_ka": null },
+    "cable": { "type": null, "section_mm2": null }
+  },
+
+  "cartouche_required_fields": {
+    "_help": "Champs de cartouche dont l'absence est une ERREUR (donnee manquante). Date et signature sont volontairement exclues (remplies a la main).",
+    "fields": ["project.address", "project.owner", "project.installer"],
+    "severity": "error"
+  },
+
+  "head_chain_required": {
+    "_help": "Elements qui doivent exister dans la chaine de tete, sinon ERREUR.",
+    "require_meter": null,
+    "require_general_breaker": null,
+    "require_main_differential": null,
+    "severity": "error"
+  },
+
+  "unifilaire": {
+    "_help": "Longueur de base de la regle des lignes (1..n). La regle s'etend automatiquement si un circuit depasse cette valeur.",
+    "ruler_min_rows": null
+  }
+}

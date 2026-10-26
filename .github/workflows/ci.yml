@@ -1,0 +1,101 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: write
+
+env:
+  GODOT_VERSION: "4.7.2"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/setup-godot
+        with:
+          version: ${{ env.GODOT_VERSION }}
+
+      # Imports the project, runs the whole GUT suite headless, and fails if any script failed
+      # to load (GUT alone would skip it silently).
+      - name: Run tests
+        run: tools/run-tests.sh
+
+  release:
+    needs: test
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      !contains(github.event.head_commit.message, '[skip release]')
+    runs-on: ubuntu-latest
+    # one release at a time, so two quick pushes never compute the same patch number
+    concurrency:
+      group: release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup-godot
+        with:
+          version: ${{ env.GODOT_VERSION }}
+          templates: "true"
+
+      - name: Compute version (MAJOR.MINOR from VERSION, PATCH auto-bumped)
+        id: version
+        run: |
+          set -euo pipefail
+          base="$(tr -d '[:space:]' < VERSION)"
+          if ! [[ "$base" =~ ^[0-9]+\.[0-9]+$ ]]; then
+            echo "VERSION must contain MAJOR.MINOR (e.g. 0.1), got '$base'" >&2
+            exit 1
+          fi
+          git fetch --tags --force
+          last="$(git tag --list "v${base}.*" | sed "s/^v${base}\.//" | grep -E '^[0-9]+$' | sort -n | tail -1 || true)"
+          patch=$(( ${last:-0} + 1 ))
+          version="${base}.${patch}"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "major=${base%%.*}" >> "$GITHUB_OUTPUT"
+          echo "Building v${version}"
+
+      - name: Stamp version into project.godot
+        run: |
+          set -euo pipefail
+          sed -i "s|^config/version=.*|config/version=\"${{ steps.version.outputs.version }}\"|" project.godot
+          grep -q "config/version=\"${{ steps.version.outputs.version }}\"" project.godot
+
+      - name: Import project
+        run: $GODOT --headless --import
+
+      - name: Export Windows build
+        run: |
+          set -euo pipefail
+          mkdir -p build/windows
+          $GODOT --headless --export-release "Windows Desktop" build/windows/Giroflee.exe
+          test -f build/windows/Giroflee.exe
+
+      - name: Package
+        run: |
+          set -euo pipefail
+          cd build/windows
+          zip -r "../Giroflee-v${{ steps.version.outputs.version }}-windows.zip" .
+
+      - name: Publish GitHub release (also creates the tag)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          flags=""
+          if [ "${{ steps.version.outputs.major }}" = "0" ]; then flags="--prerelease"; fi
+          gh release create "v${{ steps.version.outputs.version }}" \
+            "build/Giroflee-v${{ steps.version.outputs.version }}-windows.zip" \
+            --target "${GITHUB_SHA}" \
+            --title "Giroflée v${{ steps.version.outputs.version }}" \
+            --generate-notes \
+            ${flags}

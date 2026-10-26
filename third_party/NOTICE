@@ -1,0 +1,7 @@
+Third-party components
+
+- Godot Engine 4.7.2 — MIT License — https://godotengine.org
+- GUT (Godot Unit Test) 9.6.1, addons/gut — MIT License — https://github.com/bitwes/Gut
+  (development and CI only; excluded from exported builds)
+
+Fonts (Atkinson Hyperlegible, OpenDyslexic; SIL OFL) will be listed here with their licence texts when they are bundled (milestone M7).

@@ -1,0 +1,48 @@
+name: Setup Godot
+description: Install the pinned Godot version (and optionally its export templates) from the official Godot releases and expose it as $GODOT.
+
+inputs:
+  version:
+    description: Godot version without the "-stable" suffix, e.g. 4.7.2
+    required: true
+  templates:
+    description: Also install export templates ("true" / "false"). They are about 1 GB.
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Cache Godot
+      id: cache
+      uses: actions/cache@v6
+      with:
+        path: |
+          ~/godot
+          ~/.local/share/godot/export_templates
+        key: godot-${{ inputs.version }}-templates-${{ inputs.templates }}
+
+    - name: Download Godot
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        V: ${{ inputs.version }}
+        WITH_TEMPLATES: ${{ inputs.templates }}
+      run: |
+        set -euo pipefail
+        base="https://github.com/godotengine/godot/releases/download/${V}-stable"
+        mkdir -p ~/godot
+        curl -fsSL "$base/Godot_v${V}-stable_linux.x86_64.zip" -o /tmp/godot.zip
+        unzip -q /tmp/godot.zip -d ~/godot
+        if [ "${WITH_TEMPLATES}" = "true" ]; then
+          curl -fsSL "$base/Godot_v${V}-stable_export_templates.tpz" -o /tmp/templates.tpz
+          unzip -q /tmp/templates.tpz -d /tmp/tpl
+          mkdir -p ~/.local/share/godot/export_templates
+          mv /tmp/tpl/templates ~/.local/share/godot/export_templates/${V}.stable
+        fi
+
+    - name: Expose $GODOT
+      shell: bash
+      env:
+        V: ${{ inputs.version }}
+      run: echo "GODOT=$HOME/godot/Godot_v${V}-stable_linux.x86_64" >> "$GITHUB_ENV"
