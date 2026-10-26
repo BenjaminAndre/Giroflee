@@ -33,6 +33,20 @@ var tool: Tool = null
 var place_rotation: float = 0.0
 var place_flip_h: bool = false
 var place_flip_v: bool = false
+## Electric symbols: the circuit new ones join, how many items one symbol stands for (X + digit),
+## whether the author rotated the placement by hand (a socket then stops facing away from walls),
+## and the circuit and index of the last placement or pipetted symbol (what Alt reuses).
+var active_circuit: String = "A"
+var place_count: int = 1
+var place_rotation_manual: bool = false
+var last_placed: Dictionary = {}
+## First key of a two-key command waiting for its second ("C" circuit, "X" count), "" when none.
+var pending_prefix: String = ""
+## Which circuits are greyed out in this window (view state, never saved).
+var focus: CircuitFocus = CircuitFocus.new()
+var quickbar: Quickbar = Quickbar.new()
+## Style properties copied with "Copier les propriétés" ({} when nothing was copied).
+var settings_clipboard: Dictionary = {}
 var defaults: Dictionary = DEFAULT_DEFAULTS.duplicate()
 var snap_enabled: bool = true
 var viewport_size: Vector2 = Vector2(1200.0, 800.0)
@@ -48,6 +62,9 @@ var clipboard_set: Callable = Callable()
 
 ## Bumped whenever the document or the active étage changes; backends use it as a cache key.
 var revision: int = 0
+## Bumped when only the look changes (circuit focus), so that drawing caches refresh without the
+## project counting as modified.
+var view_revision: int = 0
 
 var _views: Dictionary = {}
 var _order_seen: Array[String] = []
@@ -125,7 +142,7 @@ func snap(world: Vector2, exclude: Array = [], options: Dictionary = {}) -> Snap
 
 
 func render_options() -> Dictionary:
-	return {"overrides": tool.overrides(self)}
+	return {"overrides": tool.overrides(self), "circuit_colors": true, "dimmed": focus.dimmed_letters()}
 
 
 func page_list() -> DrawList:
@@ -157,18 +174,24 @@ func set_tool(name: String) -> void:
 			tool = BlockTool.new()
 		"text":
 			tool = TextTool.new()
+		"anchor":
+			tool = AnchorTool.new()
 		_:
-			tool_name = "select"
-			tool = SelectTool.new()
+			if SymbolLibrary.for_pack(doc().pack_ref).has_type(name):
+				tool = SymbolTool.new(name)
+			else:
+				tool_name = "select"
+				tool = SelectTool.new()
 	changed.emit()
 
 
 func is_placement_tool() -> bool:
-	return tool_name == "door" or tool_name == "window" or tool_name == "stair"
+	return tool_name == "door" or tool_name == "window" or tool_name == "stair" or tool is SymbolTool
 
 
 func rotate_placement(ccw: bool) -> void:
 	place_rotation = fposmod(place_rotation + (90.0 if ccw else -90.0), 360.0)
+	place_rotation_manual = true
 	changed.emit()
 
 
@@ -230,6 +253,281 @@ func selection_bounds(core: bool = false) -> Rect2:
 		rect = b if first else rect.merge(b)
 		first = false
 	return rect
+
+
+# --- circuits and electric symbols ----------------------------------------------------------
+
+
+## Click on a circuit in the side panel: greys it out or shows it again.
+func focus_toggle(letter: String) -> void:
+	focus.toggle(letter)
+	view_revision += 1
+	changed.emit()
+
+
+## Double-click on a circuit: shows only that one, or restores what was visible before.
+func focus_solo(letter: String, all_letters: Array[String]) -> void:
+	focus.solo(letter, all_letters)
+	view_revision += 1
+	changed.emit()
+
+
+## Ids on this étage that circuit focus keeps out of picking and box selection (FR-FOCUS-1).
+func focus_excluded() -> Array:
+	var out: Array = []
+	if focus.dimmed_letters().is_empty():
+		return out
+	for entity_id: String in sheet().sorted_entity_ids():
+		var entity: Entity = sheet().entities[entity_id]
+		if entity.type == "symbol" and focus.is_dimmed(str(entity.props["circuit"])):
+			out.append(entity_id)
+	return out
+
+
+## Index a new symbol of the active circuit gets: the last placed one's with Alt (same point),
+## otherwise the next free one.
+func index_for_placement(reuse: bool) -> int:
+	if reuse and not last_placed.is_empty() and last_placed["circuit"] == active_circuit:
+		var index: int = last_placed["index"]
+		return index
+	return Numbering.next_index(doc(), active_circuit)
+
+
+## Remembers a placement so that Alt can link the next symbol to it.
+func note_placed(props: Dictionary) -> void:
+	var circuit: String = props.get("circuit", "")
+	var index: int = props.get("index", 0)
+	if not circuit.is_empty() and index > 0:
+		last_placed = {"circuit": circuit, "index": index}
+
+
+func set_active_circuit(letter: String) -> void:
+	if not CircuitPalette.is_letter(letter):
+		return
+	active_circuit = letter
+	changed.emit()
+
+
+## C + letter: moves the selected symbols to that circuit (next free indices, links kept); with
+## nothing selected it only changes the circuit new symbols join (FR-SYM-7).
+func assign_circuit(letter: String) -> void:
+	if not CircuitPalette.is_letter(letter):
+		return
+	if selection.is_empty():
+		set_active_circuit(letter)
+		return
+	var items: Array = Numbering.reassign_items(doc(), active_sheet_id, selection, letter)
+	if items.is_empty():
+		notice.emit(tr("Aucun symbole à réassigner dans la sélection"))
+		return
+	update_entities(items)
+
+
+## X + digit: the count of the selected symbols; with nothing selected, of the next placements.
+func set_count(count: int) -> void:
+	if count < 1:
+		return
+	var items: Array = []
+	for entity: Entity in selected_entities():
+		if entity.type == "symbol":
+			items.append({"id": entity.id, "props": {"count": count}})
+	if items.is_empty():
+		place_count = count
+		changed.emit()
+		return
+	update_entities(items)
+
+
+## A: switch to the tool of the entity under the cursor, carrying its settings (FR-SYM-9). Symbols of
+## a greyed-out circuit are not picked. Returns the picked id ("" when nothing).
+func pipette() -> String:
+	var picked: String = HitTest.pick(sheet(), ctx(), hover, tolerance(), focus_excluded(), spatial())
+	if picked.is_empty():
+		notice.emit(tr("Rien à copier sous le curseur"))
+		return ""
+	var entity: Entity = sheet().entities[picked]
+	var props: Dictionary = entity.props
+	match entity.type:
+		"symbol":
+			set_tool(str(props["symbol_type"]))
+			place_rotation = props["rotation"]
+			place_flip_h = props["flip_h"]
+			place_flip_v = props["flip_v"]
+			place_count = props["count"]
+			place_rotation_manual = true
+			var circuit: String = props["circuit"]
+			if not circuit.is_empty():
+				active_circuit = circuit
+				note_placed(props)
+		"opening":
+			var kind: String = props["kind"]
+			defaults["%s_width" % kind] = props["width_mm"]
+			set_tool(kind)
+			place_rotation = props["rotation"]
+			place_flip_h = props["flip_h"]
+			place_flip_v = props["flip_v"]
+		"stair":
+			defaults["stair_width"] = props["width_mm"]
+			defaults["stair_steps"] = props["steps"]
+			defaults["stair_tread"] = props["tread_mm"]
+			set_tool("stair")
+			place_rotation = props["rotation"]
+			place_flip_h = props["flip_h"]
+			place_flip_v = props["flip_v"]
+		"wall":
+			set_config("wall_weight_mm", props["weight_mm"])
+			set_tool("wall")
+		"grey_block":
+			set_tool("block")
+		"text":
+			set_tool("text")
+	changed.emit()
+	return picked
+
+
+## Re-solves label and badge positions: of the selected symbols, or of every unpinned symbol of the
+## étage when nothing is selected ("Replacer les étiquettes").
+func relabel() -> void:
+	var only: Array = []
+	for entity: Entity in selected_entities():
+		if entity.type == "symbol":
+			only.append(entity.id)
+	var solved: Dictionary = LabelSolver.solve(sheet(), ctx(), only)
+	var items: Array = []
+	for key: Variant in solved.keys():
+		var entity_id: String = str(key)
+		var entry: Dictionary = solved[key]
+		var current: Entity = sheet().entities[entity_id]
+		var before: Dictionary = current.props
+		var diff: Dictionary = _changed_props(before, entry)
+		if not diff.is_empty():
+			items.append({"id": entity_id, "props": diff})
+	if items.is_empty():
+		notice.emit(tr("Étiquettes déjà bien placées"))
+		return
+	update_entities(items)
+
+
+## "Compacter la numérotation": closes the gaps in the indices of one circuit, or of all ("").
+func compact_numbering(circuit: String = "") -> void:
+	var plan: Dictionary = Numbering.compact_plan(doc(), circuit)
+	if plan.is_empty():
+		notice.emit(tr("Numérotation déjà compacte"))
+		return
+	var commands: Array[Command] = []
+	for key: Variant in plan.keys():
+		commands.append(session.command("entity.update", {"sheet": str(key), "items": plan[key]}))
+	var result: CommandResult = session.run(commands)
+	if not result.ok:
+		notice.emit(result.error)
+
+
+## "Ancrer à un symbole": waits for a click on the parent, the selected symbols being the children.
+func begin_anchor() -> void:
+	for entity: Entity in selected_entities():
+		if entity.type == "symbol":
+			set_tool("anchor")
+			return
+	notice.emit(tr("Sélectionnez d'abord les symboles à ancrer"))
+
+
+## Anchors the selected symbols to `parent_id`, keeping every symbol where it is (FR-STACK-1).
+func anchor_selection_to(parent_id: String) -> CommandResult:
+	var parent: Entity = sheet().entities[parent_id]
+	var parent_pos: Vector2 = EntityGeometry.vec(parent.props["pos"])
+	var items: Array = []
+	for entity: Entity in selected_entities():
+		if entity.type != "symbol" or entity.id == parent_id:
+			continue
+		var offset: Vector2 = EntityGeometry.vec(entity.props["pos"]) - parent_pos
+		items.append({"id": entity.id, "props": {"anchor_parent": parent_id, "anchor_offset": [roundi(offset.x), roundi(offset.y)]}})
+	return update_entities(items)
+
+
+## "Détacher": the selected symbols stay in place and stop following a parent.
+func detach_selection() -> void:
+	var items: Array = []
+	for entity: Entity in selected_entities():
+		var parent: String = entity.props["anchor_parent"] if entity.type == "symbol" else ""
+		if not parent.is_empty():
+			items.append({"id": entity.id, "props": {"anchor_parent": "", "anchor_offset": [0, 0]}})
+	if items.is_empty():
+		notice.emit(tr("Aucun symbole ancré dans la sélection"))
+		return
+	update_entities(items)
+
+
+## "Copier les propriétés": remembers the style of the one selected entity (FR-EDIT-7).
+func copy_settings() -> void:
+	var chosen: Array[Entity] = selected_entities()
+	if chosen.size() != 1:
+		notice.emit(tr("Sélectionnez un seul élément dont copier les propriétés"))
+		return
+	settings_clipboard = StyleProps.capture(chosen[0])
+	if settings_clipboard.is_empty():
+		notice.emit(tr("Cet élément n'a pas de propriétés à copier"))
+		return
+	notice.emit(tr("Propriétés copiées"))
+
+
+## "Coller les propriétés": applies them to the selected entities of the same type.
+func paste_settings() -> void:
+	if settings_clipboard.is_empty():
+		notice.emit(tr("Aucune propriété copiée"))
+		return
+	var items: Array = StyleProps.items(sheet(), selection, settings_clipboard)
+	if items.is_empty():
+		notice.emit(tr("Rien à modifier dans la sélection"))
+		return
+	update_entities(items)
+
+
+## "Libérer les étiquettes": the selected symbols (all when nothing is selected) are no longer pinned,
+## so that "Replacer les étiquettes" may move their labels again.
+func unpin_labels() -> void:
+	var items: Array = []
+	var chosen: Array[Entity] = selected_entities()
+	if chosen.is_empty():
+		for entity_id: String in sheet().sorted_entity_ids():
+			chosen.append(sheet().entities[entity_id])
+	for entity: Entity in chosen:
+		if entity.type == "symbol" and entity.props["label_pinned"]:
+			items.append({"id": entity.id, "props": {"label_pinned": false}})
+	if items.is_empty():
+		notice.emit(tr("Aucune étiquette fixée à libérer"))
+		return
+	update_entities(items)
+
+
+## Keeps the current tool and its settings in quickbar slot 1-9.
+func store_quickbar(slot: int) -> void:
+	var preset: Dictionary = Quickbar.capture(self)
+	if preset.is_empty():
+		notice.emit(tr("Choisissez d'abord un outil à mémoriser"))
+		return
+	quickbar.assign(slot, preset)
+	changed.emit()
+	notice.emit(tr("Case %d mémorisée") % slot)
+
+
+## Digit key: switches to the preset of the slot.
+func use_quickbar(slot: int) -> void:
+	if not quickbar.is_filled(slot):
+		notice.emit(tr("Case %d vide : mémorisez un outil depuis la palette de commandes") % slot)
+		return
+	Quickbar.apply(self, quickbar.preset(slot))
+
+
+## Selects `ids` (the select-by-filter commands), skipping symbols of greyed-out circuits.
+func select_filtered(ids: Array, what: String) -> void:
+	var skip: Array = focus_excluded()
+	var kept: Array = []
+	for raw_id: Variant in ids:
+		if not skip.has(raw_id):
+			kept.append(raw_id)
+	set_tool("select")
+	set_selection(kept)
+	notice.emit(tr("%d sélectionné(s) : %s") % [kept.size(), what])
 
 
 # --- entity actions -----------------------------------------------------------------------
@@ -306,15 +604,18 @@ func rotate_selection(ccw: bool) -> void:
 		return
 	var c: Vector2 = selection_bounds().get_center()
 	var pivot: Vector2i = Vector2i(roundi(c.x), roundi(c.y))
-	var items: Array = []
-	for entity: Entity in selected_entities():
-		var turned: Dictionary = EntityMover.rotated_props_90(entity.type, entity.props, pivot, ccw)
-		items.append({"id": entity.id, "props": _changed_props(entity.props, turned)})
-	update_entities(items)
+	var carried: Dictionary = SelectionTransform.with_followers(sheet(), selection)
+	var turned_by_id: Dictionary = {}
+	var carried_ids: Array = carried["ids"]
+	for raw_id: Variant in carried_ids:
+		var entity: Entity = sheet().entities[str(raw_id)]
+		turned_by_id[entity.id] = EntityMover.rotated_props_90(entity.type, entity.props, pivot, ccw)
+	apply_transform(turned_by_id)
 
 
 ## Commits the result of a transform-box gesture ({id: new props}) as one undo step.
-func apply_transform(props_by_id: Dictionary) -> void:
+func apply_transform(raw_props_by_id: Dictionary) -> void:
+	var props_by_id: Dictionary = AnchorRules.recompute_offsets(sheet(), raw_props_by_id)
 	var items: Array = []
 	for key: Variant in props_by_id.keys():
 		var entity_id: String = str(key)
@@ -370,7 +671,7 @@ func paste(target: Variant = null) -> void:
 		var ox: int = origin[0]
 		var oy: int = origin[1]
 		where = Vector2i(ox + 2 * step, oy - 2 * step)
-	var built: Dictionary = Clipboard.to_add_items(parsed, where, session.ids)
+	var built: Dictionary = Clipboard.to_add_items(parsed, where, session.ids, doc())
 	var items: Array = built["items"]
 	var new_ids: Array = built["new_ids"]
 	var result: CommandResult = add_entities(items)
@@ -464,7 +765,7 @@ func duplicate_sheet(with_symbols: bool) -> void:
 		var origin: Array = parsed["origin"]
 		var origin_x: int = origin[0]
 		var origin_y: int = origin[1]
-		var built: Dictionary = Clipboard.to_add_items(parsed, Vector2i(origin_x, origin_y), session.ids)
+		var built: Dictionary = Clipboard.to_add_items(parsed, Vector2i(origin_x, origin_y), session.ids, doc())
 		commands.append(session.command("entity.add", {"sheet": new_sheet_id, "items": built["items"]}))
 	var result: CommandResult = session.run(commands)
 	if result.ok:

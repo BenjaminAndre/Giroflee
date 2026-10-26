@@ -8,7 +8,8 @@ extends RefCounted
 ## returns the data upgraded by exactly one version. The runner sets `format_version`.
 
 
-## Migrations shipped with the app.
+## Migrations shipped with the app. (New config keys with defaults, such as symbol_scale, need no
+## migration: loading fills missing config keys with their defaults.)
 static func default_registry() -> Dictionary:
 	return {1: _v1_to_v2}
 

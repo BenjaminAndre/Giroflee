@@ -92,3 +92,12 @@ static func flag(source: Dictionary, key: String) -> bool:
 		var b: bool = value
 		return b
 	return false
+
+
+## A boolean entry, `fallback` when absent or not a bool.
+static func bool_or(source: Dictionary, key: String, fallback: bool) -> bool:
+	var value: Variant = source.get(key, fallback)
+	if value is bool:
+		var b: bool = value
+		return b
+	return fallback

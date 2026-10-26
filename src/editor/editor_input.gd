@@ -46,6 +46,9 @@ func _handle_key(event: InputEventKey) -> bool:
 		return true
 	if not event.pressed:
 		return false
+	# the second key of "C letter" / "X digit"
+	if not model.pending_prefix.is_empty() and not event.ctrl_pressed and not event.alt_pressed and not _is_modifier(event):
+		return _complete_prefix(event)
 	# a tool may want the key first (Enter / Backspace while drawing a wall)
 	if not event.ctrl_pressed and not event.alt_pressed and model.tool.key(model, event):
 		return true
@@ -53,6 +56,10 @@ func _handle_key(event: InputEventKey) -> bool:
 		return _handle_ctrl_key(event)
 	if event.alt_pressed or event.meta_pressed:
 		return false
+	var digit: int = digit_of(event)
+	if digit > 0:
+		model.use_quickbar(digit)
+		return true
 	match event.keycode:
 		KEY_ESCAPE:
 			_escape()
@@ -69,6 +76,18 @@ func _handle_key(event: InputEventKey) -> bool:
 			model.set_tool("block")
 		KEY_T:
 			model.set_tool("text")
+		KEY_L:
+			model.set_tool("lamp")
+		KEY_I:
+			model.set_tool("switch_two_way" if event.shift_pressed else "switch")
+		KEY_P:
+			model.set_tool("socket")
+		KEY_A:
+			model.pipette()
+		KEY_C:
+			_start_prefix("C")
+		KEY_X:
+			_start_prefix("X")
 		KEY_H:
 			_flip(true)
 		KEY_V:
@@ -90,6 +109,41 @@ func _handle_key(event: InputEventKey) -> bool:
 		_:
 			return false
 	return true
+
+
+func _start_prefix(prefix: String) -> void:
+	model.pending_prefix = prefix
+	model.changed.emit()
+
+
+## Second key of "C letter" (circuit) or "X digit" (count). Anything else cancels the command.
+func _complete_prefix(event: InputEventKey) -> bool:
+	var prefix: String = model.pending_prefix
+	model.pending_prefix = ""
+	if event.keycode != KEY_ESCAPE:
+		if prefix == "C" and event.keycode >= KEY_A and event.keycode <= KEY_Z:
+			model.assign_circuit(String.chr(event.keycode))
+		elif prefix == "X":
+			var digit: int = digit_of(event)
+			if digit > 0:
+				model.set_count(digit)
+	model.changed.emit()
+	return true
+
+
+static func _is_modifier(event: InputEventKey) -> bool:
+	return event.keycode == KEY_SHIFT or event.keycode == KEY_CTRL or event.keycode == KEY_ALT or event.keycode == KEY_META
+
+
+## 1-9 for a digit key, 0 otherwise. The physical key counts, so the top row works on any layout
+## (on AZERTY the digits need Shift, the keys themselves do not).
+static func digit_of(event: InputEventKey) -> int:
+	for code: int in [event.physical_keycode, event.keycode]:
+		if code >= KEY_1 and code <= KEY_9:
+			return code - KEY_0
+		if code >= KEY_KP_1 and code <= KEY_KP_9:
+			return code - KEY_KP_0
+	return 0
 
 
 func _handle_ctrl_key(event: InputEvent) -> bool:

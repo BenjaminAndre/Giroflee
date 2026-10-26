@@ -1,0 +1,63 @@
+{
+  "format_version": 1,
+  "order": [
+    "lamp",
+    "switch",
+    "switch_two_way",
+    "socket",
+    "panel",
+    "meter"
+  ],
+  "types": {
+    "lamp": {
+      "title": "Lampe",
+      "plan": "symbols/lamp.plan.svg",
+      "unifilaire": "symbols/lamp.plan.svg",
+      "attach": "free",
+      "counts_as_point": true,
+      "uses_circuit": true
+    },
+    "switch": {
+      "title": "Interrupteur",
+      "plan": "symbols/switch.plan.svg",
+      "unifilaire": "symbols/switch.plan.svg",
+      "attach": "free",
+      "counts_as_point": true,
+      "uses_circuit": true
+    },
+    "switch_two_way": {
+      "title": "Interrupteur va-et-vient",
+      "plan": "symbols/switch_two_way.plan.svg",
+      "unifilaire": "symbols/switch_two_way.plan.svg",
+      "attach": "free",
+      "counts_as_point": true,
+      "uses_circuit": true
+    },
+    "socket": {
+      "title": "Prise",
+      "plan": "symbols/socket.plan.svg",
+      "unifilaire": "symbols/socket.unifilaire.svg",
+      "attach": "wall",
+      "counts_as_point": true,
+      "uses_circuit": true
+    },
+    "panel": {
+      "title": "Tableau (TGBT)",
+      "plan": "symbols/panel.plan.svg",
+      "attach": "free",
+      "counts_as_point": false,
+      "uses_circuit": false,
+      "caption": "TGBT",
+      "marker": true
+    },
+    "meter": {
+      "title": "Compteur kWh",
+      "plan": "symbols/meter.plan.svg",
+      "attach": "free",
+      "counts_as_point": false,
+      "uses_circuit": false,
+      "caption": "kWh",
+      "marker": true
+    }
+  }
+}

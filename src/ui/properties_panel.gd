@@ -41,6 +41,7 @@ const LABELS: Dictionary = {
 	"index": "Indice",
 	"count": "Nombre",
 	"height_mm": "Hauteur (mm)",
+	"symbol_scale": "Échelle des symboles",
 }
 
 const TYPE_TITLES: Dictionary = {
@@ -52,7 +53,7 @@ const TYPE_TITLES: Dictionary = {
 }
 
 const HIDDEN: Array[String] = [
-	"anchor_parent", "anchor_offset", "label_pinned", "label_offset", "count_offset",
+	"symbol_type", "anchor_parent", "anchor_offset", "label_pinned", "label_offset", "count_offset",
 	"host_wall", "host_offset_mm",
 ]
 
@@ -160,6 +161,9 @@ func _build_entity_section(entities: Array[Entity]) -> void:
 	if first.type == "opening":
 		var opening_kind: String = first.props["kind"]
 		title = "Porte" if opening_kind == "door" else "Fenêtre"
+	elif first.type == "symbol":
+		var def: SymbolLibrary.Def = SymbolLibrary.for_pack(model.doc().pack_ref).def(str(first.props["symbol_type"]))
+		title = def.title if def != null else "Symbole"
 	if entities.size() > 1:
 		title += " (%d)" % entities.size()
 	_add_header(title)

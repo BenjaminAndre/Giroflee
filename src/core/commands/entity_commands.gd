@@ -13,6 +13,7 @@ static func add(doc: Document, payload: Dictionary) -> BuildResult:
 	var items: Array = payload["items"]
 	var ops: Array[Dictionary] = []
 	var seen: Dictionary = {}
+	var proposed: Dictionary = {}
 	for item: Variant in items:
 		if not (item is Dictionary):
 			return BuildResult.fail("each item must be an object")
@@ -40,7 +41,11 @@ static func add(doc: Document, payload: Dictionary) -> BuildResult:
 		if not problem.is_empty():
 			return BuildResult.fail("entity %s: %s" % [entity_id, problem])
 		seen[entity_id] = true
+		proposed[entity_id] = {"type": type, "props": props}
 		ops.append(Patch.entity_op(sheet.id, entity_id, null, {"type": type, "props": props}))
+	var anchor_problem: String = AnchorRules.check(sheet, proposed)
+	if not anchor_problem.is_empty():
+		return BuildResult.fail(anchor_problem)
 	return BuildResult.success(ops)
 
 
@@ -54,6 +59,7 @@ static func update(doc: Document, payload: Dictionary) -> BuildResult:
 	var items: Array = payload["items"]
 	var ops: Array[Dictionary] = []
 	var seen: Dictionary = {}
+	var proposed: Dictionary = {}
 	for item: Variant in items:
 		if not (item is Dictionary):
 			return BuildResult.fail("each item must be an object")
@@ -78,7 +84,11 @@ static func update(doc: Document, payload: Dictionary) -> BuildResult:
 		if not problem.is_empty():
 			return BuildResult.fail("entity %s: %s" % [entity_id, problem])
 		if merged != entity.props:
+			proposed[entity_id] = {"type": entity.type, "props": merged}
 			ops.append(Patch.entity_op(sheet.id, entity_id, entity.snapshot(), {"type": entity.type, "props": merged}))
+	var anchor_problem: String = AnchorRules.check(sheet, proposed)
+	if not anchor_problem.is_empty():
+		return BuildResult.fail(anchor_problem)
 	return BuildResult.success(ops)
 
 
@@ -98,6 +108,23 @@ static func remove(doc: Document, payload: Dictionary) -> BuildResult:
 		var entity: Entity = sheet.entities[entity_id]
 		removed[entity_id] = true
 		ops.append(Patch.entity_op(sheet.id, entity_id, entity.snapshot(), null))
+	# symbols that stay but lose their anchor parent stay where they are, unanchored (FR-STACK-2)
+	var proposed: Dictionary = {}
+	for entity_id: String in sheet.sorted_entity_ids():
+		var anchored: Entity = sheet.entities[entity_id]
+		if removed.has(entity_id) or anchored.type != "symbol":
+			continue
+		var parent: String = anchored.props["anchor_parent"]
+		if not parent.is_empty() and removed.has(parent):
+			var detached: Dictionary = anchored.props.duplicate(true)
+			detached["anchor_parent"] = ""
+			detached["anchor_offset"] = [0, 0]
+			proposed[entity_id] = {"type": "symbol", "props": detached}
+			ops.append(Patch.entity_op(sheet.id, entity_id, anchored.snapshot(), {"type": "symbol", "props": detached}))
+	var removed_ids: Array = removed.keys()
+	var remove_problem: String = AnchorRules.check(sheet, proposed, removed_ids)
+	if not remove_problem.is_empty():
+		return BuildResult.fail(remove_problem)
 	# openings that stay but lose their host wall become free-standing (no dangling reference)
 	for entity_id: String in sheet.sorted_entity_ids():
 		var entity: Entity = sheet.entities[entity_id]
@@ -128,14 +155,31 @@ static func move(doc: Document, payload: Dictionary) -> BuildResult:
 	var dy: int = d[1]
 	var requested: Array = payload["ids"]
 	var ids: Array = _with_hosted_openings(sheet, requested)
+	for carried: String in AnchorRules.descendants(sheet, ids):
+		ids.append(carried)
 	var ops: Array[Dictionary] = []
 	if dx == 0 and dy == 0:
 		return BuildResult.success(ops)
+	var moved_set: Dictionary = {}
+	for raw_id: Variant in ids:
+		moved_set[str(raw_id)] = true
+	var proposed: Dictionary = {}
 	for raw_id: Variant in ids:
 		var entity_id: String = raw_id
 		var entity: Entity = sheet.entities[entity_id]
 		var moved: Dictionary = EntityMover.shifted_props(entity.type, entity.props, dx, dy)
+		if entity.type == "symbol":
+			var parent: String = entity.props["anchor_parent"]
+			if not parent.is_empty() and not moved_set.has(parent):
+				# moved on its own: its place within the stack changes
+				var parent_pos: Vector2 = EntityGeometry.vec(sheet.entities[parent].props["pos"])
+				var offset: Vector2 = EntityGeometry.vec(moved["pos"]) - parent_pos
+				moved["anchor_offset"] = [roundi(offset.x), roundi(offset.y)]
+		proposed[entity_id] = {"type": entity.type, "props": moved}
 		ops.append(Patch.entity_op(sheet.id, entity_id, entity.snapshot(), {"type": entity.type, "props": moved}))
+	var anchor_problem: String = AnchorRules.check(sheet, proposed)
+	if not anchor_problem.is_empty():
+		return BuildResult.fail(anchor_problem)
 	return BuildResult.success(ops)
 
 

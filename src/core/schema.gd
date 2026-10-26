@@ -88,6 +88,8 @@ const CONFIG_SPEC: Dictionary = {
 	"title_pos_mm": {"kind": "vec2i", "default": [366, 34]},
 	"ghost_on": {"kind": "bool", "default": false},
 	"hints": {"kind": "bool", "default": true},
+	# one scale for every electric symbol (SRD FR-CSYM-2)
+	"symbol_scale": {"kind": "float", "default": 1.0},
 }
 
 ## Settings that used to be per sheet (format 1) and are project-wide since format 2.
@@ -253,6 +255,9 @@ static func check_config(config: Dictionary) -> String:
 	var weight: float = config["wall_weight_mm"]
 	if size <= 0.0 or weight <= 0.0:
 		return "font_size_pt and wall_weight_mm must be positive"
+	var symbol_scale: float = config["symbol_scale"]
+	if symbol_scale < 0.1 or symbol_scale > 5.0:
+		return "symbol_scale must be between 0.1 and 5"
 	return ""
 
 

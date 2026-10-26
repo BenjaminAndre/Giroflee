@@ -5,7 +5,7 @@ extends RefCounted
 ##
 ## Links between copied entities are kept: an opening whose wall is part of the copy still
 ## follows the copied wall; a link to something that was not copied is dropped. Symbols get
-## their indices reassigned in M3 (SRD FR-EDIT-3); until then pasted symbols have index 0.
+## their indices reassigned on paste (SRD FR-EDIT-3).
 
 const HEADER: String = "giroflee/1"
 
@@ -24,6 +24,8 @@ static func serialize(sheet: Sheet, ids: Array, include_symbols: bool = true) ->
 			var host: String = entity.props["host_wall"]
 			if wanted.has(host):
 				wanted[entity_id] = true
+	for carried: String in AnchorRules.descendants(sheet, wanted.keys()):
+		wanted[carried] = true
 	var items: Array = []
 	var origin: Variant = null
 	for entity_id: String in sheet.sorted_entity_ids():
@@ -71,8 +73,10 @@ static func parse(text: String) -> Dictionary:
 
 
 ## `entity.add` items for the parsed selection, moved so that its origin lands on `target`,
-## with fresh ids from `ids`. Returns {"items": Array, "new_ids": Array[String]}.
-static func to_add_items(parsed: Dictionary, target: Vector2i, ids: IdGenerator) -> Dictionary:
+## with fresh ids from `ids`. Returns {"items": Array, "new_ids": Array[String]}. With `doc`, pasted
+## symbols get fresh indices in their circuit, links between pasted symbols kept (FR-EDIT-3); without
+## it they come out unassigned (index 0).
+static func to_add_items(parsed: Dictionary, target: Vector2i, ids: IdGenerator, doc: Document = null) -> Dictionary:
 	var items: Array = parsed["items"]
 	var origin: Array = parsed["origin"]
 	var ox: int = origin[0]
@@ -86,6 +90,8 @@ static func to_add_items(parsed: Dictionary, target: Vector2i, ids: IdGenerator)
 		new_ids[key] = ids.next_uuid()
 	var out: Array = []
 	var added: Array[String] = []
+	var next_for: Dictionary = {}
+	var assigned: Dictionary = {}
 	for item: Variant in items:
 		var entry: Dictionary = item
 		var key: String = entry["key"]
@@ -98,9 +104,22 @@ static func to_add_items(parsed: Dictionary, target: Vector2i, ids: IdGenerator)
 			if str(moved["host_wall"]).is_empty():
 				moved["host_offset_mm"] = 0
 		if type == "symbol":
+			var old_index: int = moved["index"]
+			var circuit: String = moved["circuit"]
 			moved["index"] = 0
+			if doc != null and old_index > 0 and not circuit.is_empty():
+				var link: String = "%s|%d" % [circuit, old_index]
+				if not assigned.has(link):
+					if not next_for.has(circuit):
+						next_for[circuit] = Numbering.next_index(doc, circuit)
+					var fresh: int = next_for[circuit]
+					assigned[link] = fresh
+					next_for[circuit] = fresh + 1
+				moved["index"] = assigned[link]
 			var parent: String = moved.get("anchor_parent", "")
 			moved["anchor_parent"] = str(new_ids.get(parent, "")) if not parent.is_empty() else ""
+			if str(moved["anchor_parent"]).is_empty():
+				moved["anchor_offset"] = [0, 0]
 		var new_id: String = new_ids[key]
 		out.append({"id": new_id, "type": type, "props": moved})
 		added.append(new_id)

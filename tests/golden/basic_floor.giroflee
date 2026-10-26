@@ -13,6 +13,7 @@
     "ghost_on": true,
     "hints": true,
     "provisoire_mark": true,
+    "symbol_scale": 1.0,
     "title_pos_mm": [366, 34],
     "wall_weight_mm": 1.4
   },

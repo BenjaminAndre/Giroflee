@@ -16,6 +16,10 @@ const TOOLS: Array[Dictionary] = [
 	{"id": "stair", "tip": "Escalier (E)"},
 	{"id": "block", "tip": "Bloc gris (S)"},
 	{"id": "text", "tip": "Texte (T)"},
+	{"id": "lamp", "tip": "Lampe (L)", "group": true},
+	{"id": "switch", "tip": "Interrupteur (I)"},
+	{"id": "switch_two_way", "tip": "Interrupteur va-et-vient (Maj+I)"},
+	{"id": "socket", "tip": "Prise (P)"},
 ]
 
 var model: EditorModel
@@ -31,6 +35,8 @@ func _init() -> void:
 	add_child(column)
 	for tool: Dictionary in TOOLS:
 		var tool_id: String = tool["id"]
+		if tool.get("group", false):
+			column.add_child(HSeparator.new())
 		var button: Button = Button.new()
 		button.toggle_mode = true
 		button.button_group = _group

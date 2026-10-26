@@ -146,4 +146,9 @@ func check_integrity() -> String:
 				return "entity index is stale for %s" % entity_id
 	if seen.size() != _entity_sheet.size():
 		return "entity index has stale entries"
+	for sheet_id: String in sheet_order:
+		var checked: Sheet = sheets[sheet_id]
+		var anchor_problem: String = AnchorRules.check(checked)
+		if not anchor_problem.is_empty():
+			return anchor_problem
 	return ""

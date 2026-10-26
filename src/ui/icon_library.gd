@@ -4,7 +4,7 @@ extends RefCounted
 ## size needed so they stay crisp at any UI scale (SRD FR-TOOLBAR-4). They are authored on a
 ## 24 x 24 grid in the Latte palette (ink and a blue accent).
 
-const NAMES: PackedStringArray = ["select", "wall", "door", "window", "stair", "block", "text"]
+const NAMES: PackedStringArray = ["select", "wall", "door", "window", "stair", "block", "text", "lamp", "switch", "switch_two_way", "socket", "panel", "meter"]
 const DIR: String = "res://assets/icons"
 const GRID: float = 24.0
 

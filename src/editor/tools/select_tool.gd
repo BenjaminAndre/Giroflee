@@ -2,9 +2,10 @@ class_name SelectTool
 extends Tool
 ## The default tool: click and Shift-click to select, drag on empty space for a box selection,
 ## drag a selected entity to move the selection (with snapping), drag a handle to reshape a
-## wall vertex or resize a grey block (SRD FR-EDIT-1). Each gesture is one undo step.
+## wall vertex or resize a grey block, drag a symbol's circuit label or count badge to place it by
+## hand, which pins it (SRD FR-EDIT-1, FR-SYM-5). Each gesture is one undo step.
 
-enum Mode { IDLE, BOX, MOVE, HANDLE, TRANSFORM }
+enum Mode { IDLE, BOX, MOVE, HANDLE, TRANSFORM, LABEL }
 
 var _mode: Mode = Mode.IDLE
 var _target_id: String = ""
@@ -22,6 +23,11 @@ var _t_grab: Vector2 = Vector2.ZERO
 var _t_entities: Array[Entity] = []
 var _t_followers: Array = []
 var _t_props: Dictionary = {}
+# label drag
+var _label_key: String = ""
+var _label_grab: Vector2 = Vector2.ZERO
+var _label_props: Dictionary = {}
+var _label_moved: bool = false
 
 
 func tool_name() -> String:
@@ -68,7 +74,16 @@ func press(model: EditorModel, input: ToolInput) -> void:
 		if not box_handle.is_empty():
 			_begin_transform(model, box, box_handle, input.world)
 			return
-	var picked: String = HitTest.pick(model.sheet(), model.ctx(), input.world, input.tolerance, [], model.spatial())
+	var label: Dictionary = _label_at(model, input.world, input.tolerance)
+	if not label.is_empty():
+		_mode = Mode.LABEL
+		_target_id = str(label["entity"])
+		_label_key = str(label["key"])
+		_label_grab = label["grab"]
+		_label_props = {}
+		_label_moved = false
+		return
+	var picked: String = HitTest.pick(model.sheet(), model.ctx(), input.world, input.tolerance, model.focus_excluded(), model.spatial())
 	if not picked.is_empty():
 		if input.double_click:
 			var entity: Entity = model.sheet().entities[picked]
@@ -108,6 +123,9 @@ func move(model: EditorModel, input: ToolInput) -> void:
 			_handle_props = _props_with_handle(model, at)
 		Mode.TRANSFORM:
 			_update_transform(model, input)
+		Mode.LABEL:
+			_label_props = _props_with_label(model, input.world)
+			_label_moved = true
 		Mode.IDLE:
 			model.hover_handle = _hover_handle(model, input)
 	model.changed.emit()
@@ -120,7 +138,7 @@ func release(model: EditorModel, input: ToolInput) -> void:
 		Mode.BOX:
 			var rect: Rect2 = Rect2(_box_start, input.world - _box_start).abs()
 			if rect.size.length() > input.tolerance:
-				var hits: Array[String] = HitTest.in_rect(model.sheet(), model.ctx(), rect, [], model.spatial())
+				var hits: Array[String] = HitTest.in_rect(model.sheet(), model.ctx(), rect, model.focus_excluded(), model.spatial())
 				if input.shift:
 					var merged: Array = model.selection.duplicate()
 					for entity_id: String in hits:
@@ -142,6 +160,14 @@ func release(model: EditorModel, input: ToolInput) -> void:
 					model.update_entities([{"id": _target_id, "props": diff}])
 	if finished == Mode.TRANSFORM:
 		model.apply_transform(_t_props)
+	if finished == Mode.LABEL:
+		if _label_moved and not _label_props.is_empty():
+			var moved: Entity = model.sheet().entities[_target_id]
+			var diff: Dictionary = EditorModel._changed_props(moved.props, _label_props)
+			if not diff.is_empty():
+				model.update_entities([{"id": _target_id, "props": diff}])
+		elif not _label_moved:
+			model.set_selection([_target_id])
 	_clear_transform()
 	_delta = Vector2i.ZERO
 	_handle = {}
@@ -157,6 +183,7 @@ func cancel(model: EditorModel) -> bool:
 	_delta = Vector2i.ZERO
 	_handle = {}
 	_handle_props = {}
+	_label_props = {}
 	_clear_transform()
 	model.changed.emit()
 	return true
@@ -166,6 +193,7 @@ func overrides(model: EditorModel) -> Dictionary:
 	var out: Dictionary = {}
 	if _mode == Mode.MOVE and _delta != Vector2i.ZERO:
 		var moving: Array = model.selection.duplicate()
+		moving.append_array(AnchorRules.descendants(model.sheet(), moving))
 		for entity_id: String in model.sheet().sorted_entity_ids():
 			var entity: Entity = model.sheet().entities[entity_id]
 			var carried: bool = moving.has(entity_id)
@@ -176,6 +204,8 @@ func overrides(model: EditorModel) -> Dictionary:
 				out[entity_id] = EntityMover.shifted_props(entity.type, entity.props, _delta.x, _delta.y)
 	elif _mode == Mode.HANDLE and not _handle_props.is_empty():
 		out[_target_id] = _handle_props
+	elif _mode == Mode.LABEL and not _label_props.is_empty():
+		out[_target_id] = _label_props
 	elif _mode == Mode.TRANSFORM:
 		return _t_props
 	return out
@@ -203,6 +233,44 @@ func _handle_at(model: EditorModel, world: Vector2, radius: float) -> Dictionary
 			best_distance = distance
 			best = handle
 	return best
+
+
+## The label or count badge of a symbol under `world`: {"entity", "key" ("label_offset" or
+## "count_offset"), "grab": centre minus pointer}, or {}. Symbols of greyed-out circuits are skipped.
+func _label_at(model: EditorModel, world: Vector2, tolerance: float) -> Dictionary:
+	var ctx: RenderContext = model.ctx()
+	var size: float = SymbolGeometry.label_size(ctx)
+	var skip: Array = model.focus_excluded()
+	for entity_id: String in model.sheet().sorted_entity_ids():
+		var entity: Entity = model.sheet().entities[entity_id]
+		if entity.type != "symbol" or skip.has(entity_id):
+			continue
+		var origin: Vector2 = EntityGeometry.vec(entity.props["pos"])
+		var parts: Array[Dictionary] = [
+			{"key": "label_offset", "text": SymbolGeometry.label_text(entity), "offset": SymbolGeometry.effective_label_offset(entity, ctx), "size": size},
+			{"key": "count_offset", "text": SymbolGeometry.count_text(entity), "offset": SymbolGeometry.effective_count_offset(entity, ctx), "size": size * SymbolGeometry.BADGE_FACTOR},
+		]
+		for part: Dictionary in parts:
+			var text: String = part["text"]
+			if text.is_empty():
+				continue
+			var offset: Vector2 = part["offset"]
+			var part_size: float = part["size"]
+			var box: Rect2 = SymbolGeometry.text_box(text, origin + offset, part_size)
+			if box.grow(tolerance * 0.3).has_point(world):
+				return {"entity": entity_id, "key": part["key"], "grab": origin + offset - world}
+	return {}
+
+
+## Props of the dragged symbol with its label (or badge) following the pointer, and pinned.
+func _props_with_label(model: EditorModel, world: Vector2) -> Dictionary:
+	var entity: Entity = model.sheet().entities[_target_id]
+	var props: Dictionary = entity.props.duplicate(true)
+	var origin: Vector2 = EntityGeometry.vec(entity.props["pos"])
+	var offset: Vector2 = world + _label_grab - origin
+	props[_label_key] = [roundi(offset.x), roundi(offset.y)]
+	props["label_pinned"] = true
+	return props
 
 
 ## Props of the dragged entity with the grabbed handle moved to `at`.

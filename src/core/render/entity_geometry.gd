@@ -197,6 +197,8 @@ static func add_ops(entity: Entity, ctx: RenderContext, ghost: bool, out: DrawLi
 					out.add(DrawOp.polygon(polygon, line_color, "stairs" + suffix, entity.id))
 		"grey_block":
 			out.add(DrawOp.polygon(block_polygon(props), fill_color, "blocks" + suffix, entity.id))
+		"symbol":
+			SymbolGeometry.add_ops(entity, ctx, ghost, out)
 		"text":
 			if ghost:
 				return
@@ -243,6 +245,8 @@ static func bounds(entity: Entity, ctx: RenderContext) -> Rect2:
 			return _bounds_of(block_polygon(props))
 		"text":
 			return text_rect(props, ctx)
+		"symbol":
+			return SymbolGeometry.bounds(entity, ctx)
 	var origin: Vector2 = vec(props["pos"]) if props.has("pos") else Vector2.ZERO
 	return Rect2(origin, Vector2.ZERO).grow(100.0)
 
@@ -283,6 +287,12 @@ static func distance_to(entity: Entity, ctx: RenderContext, p: Vector2) -> float
 				return 0.0
 			var nearest: Vector2 = Vector2(clampf(p.x, rect.position.x, rect.end.x), clampf(p.y, rect.position.y, rect.end.y))
 			return p.distance_to(nearest)
+		"symbol":
+			var body: Rect2 = SymbolGeometry.bounds(entity, ctx)
+			if body.has_point(p):
+				return 0.0
+			var closest: Vector2 = Vector2(clampf(p.x, body.position.x, body.end.x), clampf(p.y, body.position.y, body.end.y))
+			return p.distance_to(closest)
 	return INF
 
 

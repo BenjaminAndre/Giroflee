@@ -17,6 +17,8 @@ var menu_bar: MenuBar
 var toolbar: ToolPalette
 var canvas: CanvasView
 var panel: PropertiesPanel
+var circuits: CircuitPanel
+var quickbar_view: QuickbarView
 var palette: PaletteOverlay
 var tabs: TabBar
 var status_hint: Label
@@ -80,8 +82,16 @@ func _init() -> void:
 	canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	work.add_child(canvas)
+	var side: VBoxContainer = VBoxContainer.new()
+	split.add_child(side)
+	circuits = CircuitPanel.new()
+	side.add_child(circuits)
 	panel = PropertiesPanel.new()
-	split.add_child(panel)
+	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	side.add_child(panel)
+
+	quickbar_view = QuickbarView.new()
+	root.add_child(quickbar_view)
 
 	var status_bar: PanelContainer = PanelContainer.new()
 	status_bar.theme_type_variation = "ToolPanel"
@@ -143,6 +153,8 @@ func open_document(doc: Document, p_path: String = "") -> void:
 	input.new_window_requested.connect(new_window)
 	canvas.bind(model, input)
 	panel.bind(model)
+	circuits.bind(model)
+	quickbar_view.bind(model)
 	toolbar.bind(model)
 	_saved_revision = model.revision
 	_autosaved_revision = model.revision
@@ -241,7 +253,7 @@ func _pick_file(mode: DisplayServer.FileDialogMode, title: String, callback: Cal
 # --- menu bar -----------------------------------------------------------------------------
 
 
-## The PopupMenu of a top-level menu ("Fichier", "Édition", "Étage", "Affichage", "Projet").
+## The PopupMenu of a top-level menu ("Fichier", "Édition", "Symboles", "Étage", "Affichage", "Projet").
 func menu(title: String) -> PopupMenu:
 	if _menus.has(title):
 		var popup: PopupMenu = _menus[title]
@@ -273,6 +285,18 @@ func _build_menus() -> void:
 		{"text": "Dupliquer", "hint": "Ctrl+D", "do": func() -> void: model.duplicate_selection()},
 		{"text": "Supprimer", "do": func() -> void: model.delete_selection()},
 		{"text": "Tout sélectionner", "do": func() -> void: model.select_all()},
+		{"separator": true},
+		{"text": "Copier les propriétés", "do": func() -> void: model.copy_settings()},
+		{"text": "Coller les propriétés", "do": func() -> void: model.paste_settings()},
+	])
+	_add_menu("Symboles", [
+		{"text": "Pipette", "hint": "A", "do": func() -> void: model.pipette()},
+		{"text": "Replacer les étiquettes", "do": func() -> void: model.relabel()},
+		{"text": "Libérer les étiquettes fixées à la main", "do": func() -> void: model.unpin_labels()},
+		{"text": "Compacter la numérotation", "do": func() -> void: model.compact_numbering()},
+		{"separator": true},
+		{"text": "Ancrer à un symbole", "do": func() -> void: model.begin_anchor()},
+		{"text": "Détacher", "do": func() -> void: model.detach_selection()},
 	])
 	_add_menu("Étage", [
 		{"text": "Nouvel étage", "hint": "Ctrl+T", "do": func() -> void: model.new_sheet()},
@@ -488,13 +512,19 @@ func _show_notice(message: String) -> void:
 func _update_status() -> void:
 	if model == null:
 		return
-	status_hint.text = _notice_text if not _notice_text.is_empty() else model.tool.hint(model)
+	var hint: String = model.tool.hint(model)
+	if model.pending_prefix == "C":
+		hint = "Circuit : tapez une lettre (A à Z) pour la sélection, ou pour les prochains symboles · Échap = annuler"
+	elif model.pending_prefix == "X":
+		hint = "Nombre : tapez un chiffre (1 à 9) · Échap = annuler"
+	status_hint.text = _notice_text if not _notice_text.is_empty() else hint
+	var circuit_text: String = "circuit %s%s" % [model.active_circuit, " ×%d" % model.place_count if model.place_count > 1 else ""]
 	var view: ViewTransform = model.view()
 	var snap_text: String = ""
 	if model.hover_snap != null and model.hover_snap.kind != SnapEngine.NONE:
 		snap_text = "  ·  %s" % ("sommet" if model.hover_snap.kind == SnapEngine.VERTEX else ("milieu" if model.hover_snap.kind == SnapEngine.MIDPOINT else "grille"))
 	var pos: Vector2 = model.hover
-	status_info.text = "x %s  y %s  ·  zoom %d %%%s " % [Fmt.length(pos.x), Fmt.length(pos.y), roundi(view.zoom * 100.0 / 0.1), snap_text]
+	status_info.text = "%s  ·  x %s  y %s  ·  zoom %d %%%s " % [circuit_text, Fmt.length(pos.x), Fmt.length(pos.y), roundi(view.zoom * 100.0 / 0.1), snap_text]
 	_update_title()
 
 

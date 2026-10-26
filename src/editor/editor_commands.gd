@@ -47,7 +47,41 @@ static func build(model: EditorModel) -> Array[Entry]:
 	list.append(Entry.new("tool.stair", "Outil escalier", "E", model.set_tool.bind("stair")))
 	list.append(Entry.new("tool.block", "Outil bloc gris", "S", model.set_tool.bind("block")))
 	list.append(Entry.new("tool.text", "Outil texte", "T", model.set_tool.bind("text")))
+	_add_symbol_commands(model, list)
 	return list
+
+
+static func _add_symbol_commands(model: EditorModel, list: Array[Entry]) -> void:
+	var library: SymbolLibrary = SymbolLibrary.for_pack(model.doc().pack_ref)
+	var keys: Dictionary = {"lamp": "L", "switch": "I", "switch_two_way": "Maj+I", "socket": "P"}
+	for type: String in library.order:
+		var def: SymbolLibrary.Def = library.def(type)
+		list.append(Entry.new("tool.symbol.%s" % type, "Outil %s" % def.title.to_lower(), str(keys.get(type, "")), model.set_tool.bind(type)))
+	list.append(Entry.new("edit.pipette", "Pipette : prendre l'outil de l'élément sous le curseur", "A", model.pipette))
+	list.append(Entry.new("symbols.relabel", "Replacer les étiquettes", "", model.relabel))
+	list.append(Entry.new("symbols.unpin", "Libérer les étiquettes fixées à la main", "", model.unpin_labels))
+	list.append(Entry.new("symbols.compact", "Compacter la numérotation", "", model.compact_numbering))
+	list.append(Entry.new("anchor.set", "Ancrer à un symbole", "", model.begin_anchor))
+	list.append(Entry.new("anchor.detach", "Détacher", "", model.detach_selection))
+	list.append(Entry.new("edit.copy_settings", "Copier les propriétés", "", model.copy_settings))
+	list.append(Entry.new("edit.paste_settings", "Coller les propriétés", "", model.paste_settings))
+	for letter: String in Numbering.circuits_in_use(model.doc()):
+		var circuit: String = letter
+		list.append(Entry.new("select.circuit.%s" % circuit, "Sélectionner tout le circuit %s" % circuit, "",
+			func() -> void: model.select_filtered(Selectors.symbols_of_circuit(model.sheet(), circuit), "circuit %s" % circuit)))
+	for type: String in library.order:
+		var def: SymbolLibrary.Def = library.def(type)
+		var kind: String = type
+		var title: String = def.title
+		list.append(Entry.new("select.type.%s" % kind, "Sélectionner tous les symboles de type %s" % title.to_lower(), "",
+			func() -> void: model.select_filtered(Selectors.symbols_of_type(model.sheet(), kind), title.to_lower())))
+	list.append(Entry.new("select.no_circuit", "Sélectionner les symboles sans circuit", "",
+		func() -> void: model.select_filtered(Selectors.symbols_without_circuit(model.sheet(), library), "sans circuit")))
+	list.append(Entry.new("select.custom_text", "Sélectionner les textes à police ou taille personnalisée", "",
+		func() -> void: model.select_filtered(Selectors.custom_texts(model.sheet()), "textes personnalisés")))
+	for slot: int in range(1, Quickbar.SLOTS + 1):
+		list.append(Entry.new("quickbar.set.%d" % slot, "Barre rapide : mémoriser l'outil actuel dans la case %d" % slot, "", model.store_quickbar.bind(slot)))
+	list.append(Entry.new("quickbar.clear", "Barre rapide : vider toutes les cases", "", model.quickbar.clear))
 
 
 ## Indices of `entries` matching `query`, best first. An empty query lists everything.

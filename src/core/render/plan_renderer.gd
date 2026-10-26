@@ -5,19 +5,26 @@ extends RefCounted
 ## Order (bottom to top): ghost sheets, frame, grey blocks, stairs, openings, walls, labels,
 ## étage title. Within a type, entities are drawn in id order, so output is deterministic.
 
-const TYPE_ORDER: Array[String] = ["grey_block", "stair", "opening", "wall", "text"]
+const TYPE_ORDER: Array[String] = ["grey_block", "stair", "opening", "wall", "symbol", "text"]
 
 
 ## Options: {"ghost": bool} overrides whether the ghost view is drawn (default: the project's
 ## `ghost_on`); {"frame": bool} (default true) draws the border frame;
 ## {"overrides": {entity_id: props}} draws those entities with other properties (live previews
-## of drags and resizes, before any command is committed).
+## of drags and resizes, before any command is committed); {"circuit_colors": bool} colours
+## symbols by circuit and {"dimmed": [letters]} greys those circuits out (on-screen only).
 static func build(doc: Document, sheet_id: String, options: Dictionary = {}) -> DrawList:
 	var list: DrawList = DrawList.new()
 	var sheet: Sheet = doc.get_sheet(sheet_id)
 	if sheet == null:
 		return list
 	var ctx: RenderContext = RenderContext.for_sheet(doc, sheet)
+	if options.has("circuit_colors"):
+		ctx.circuit_colors = options["circuit_colors"]
+	if options.has("dimmed"):
+		var dimmed: Array = options["dimmed"]
+		for letter: Variant in dimmed:
+			ctx.dimmed_circuits.append(str(letter))
 
 	var show_ghost: bool = ctx.ghost_on
 	if options.has("ghost"):

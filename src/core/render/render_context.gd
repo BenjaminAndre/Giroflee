@@ -13,6 +13,12 @@ var frame_rows: int = 8
 var title_pos_mm: Vector2 = Vector2(366, 34)
 var ghost_on: bool = false
 var hints: bool = true
+## Symbol artwork of the project's pack, and the project-wide symbol scale (SRD FR-CSYM-2).
+var library: SymbolLibrary = null
+var symbol_scale: float = 1.0
+## On-screen options (never set for exports): colour symbols by circuit, grey out these circuits.
+var circuit_colors: bool = false
+var dimmed_circuits: Array[String] = []
 
 
 static func for_sheet(doc: Document, sheet: Sheet) -> RenderContext:
@@ -28,6 +34,8 @@ static func for_sheet(doc: Document, sheet: Sheet) -> RenderContext:
 	ctx.title_pos_mm = EntityGeometry.vec(doc.config["title_pos_mm"])
 	ctx.ghost_on = doc.config["ghost_on"]
 	ctx.hints = doc.config["hints"]
+	ctx.symbol_scale = doc.config["symbol_scale"]
+	ctx.library = SymbolLibrary.for_pack(doc.pack_ref)
 	return ctx
 
 

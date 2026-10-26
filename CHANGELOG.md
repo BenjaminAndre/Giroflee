@@ -22,6 +22,9 @@ Versions are `vMAJOR.MINOR.PATCH`: `MAJOR.MINOR` come from the `VERSION` file, `
 - Tests: transform handles, project-wide settings and migration, menu bar and tool bar in the real window, theme tokens and contrast, icons, logo at 256 and 32 px, ICO structure, splash; opt-in visual tests for antialiasing and handle/preview screenshots; 2D renderer settings guarded by a unit test.
 - `tools/make_branding.gd` regenerates the raster branding assets.
 
+- **M3 electric symbols** (SRD section 19.6): pack and symbol library (Belgium: lamp, switch, two-way switch, socket, TGBT and kWh markers), strict SVG subset parser, symbols drawn at paper size with circuit colours (colour-blind-safe palette); circuits and numbering (next free index, points, "Compacter la numérotation", fresh indices on paste); symbol tools (`L`, `I`, `Shift+I`, `P`), Alt-place, sockets that sit against the wall and face into the room, `C` letter (circuit) and `X` digit (count), pipette (`A`), quickbar (keys 1 to 9, filled from the palette), copy and paste of properties, select by filter, circuit focus (click greys a circuit, double-click isolates it), label solver with draggable pinned labels, anchoring (stacks that move, rotate, copy and delete as one); circuit panel, quickbar strip, symbol tool buttons, "Symboles" menu.
+- Tests: 579 in total, including a replayed electrical workflow in the real window.
+
 ### Changed
 - CI: releases are normal releases marked **Latest** (pre-releases can never be "Latest"), with a version-less `Giroflee-windows.zip` asset for a stable latest-download link; a tag pushed by hand (`vX.Y.Z`) builds and publishes that exact version. Existing v0.1.1 to v0.1.3 are untouched.
 - CLI: `run-script` moved from "planned" to implemented.

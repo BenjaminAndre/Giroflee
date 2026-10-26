@@ -6,21 +6,24 @@ extends RefCounted
 ## their own size.
 
 
-## `ids` plus the openings hosted by walls in `ids`. Returns {"ids": Array, "followers": Array}.
+## `ids` plus what travels with them: the openings hosted by walls in `ids` and the symbols anchored
+## to symbols in `ids` (the whole stack). Returns {"ids": Array, "followers": Array (sorted)}.
 static func with_followers(sheet: Sheet, ids: Array) -> Dictionary:
-	var all: Array = ids.duplicate()
 	var followers: Array = []
 	for entity_id: String in sheet.sorted_entity_ids():
-		if all.has(entity_id):
+		if ids.has(entity_id):
 			continue
 		var entity: Entity = sheet.entities[entity_id]
 		if entity.type != "opening":
 			continue
 		var host: String = entity.props["host_wall"]
 		if not host.is_empty() and ids.has(host):
-			all.append(entity_id)
 			followers.append(entity_id)
-	return {"ids": all, "followers": followers}
+	for carried: String in AnchorRules.descendants(sheet, ids):
+		if not followers.has(carried):
+			followers.append(carried)
+	followers.sort()
+	return {"ids": ids + followers, "followers": followers}
 
 
 ## New props for scaling `entities` by (sx, sy) about `anchor` (world mm).

@@ -1,6 +1,6 @@
 # Giroflée — Software Requirements Document
 
-Status: **draft 0.7** · Progress: see section 0.1 · Language of this document: English · Language of the product: French (v0.1)
+Status: **draft 0.8** · Progress: see section 0.1 · Language of this document: English · Language of the product: French (v0.1)
 Audience: the author, and Claude (as the implementing agent). Technical notes are mixed in on purpose and marked **[TECH]**. Requirements are numbered so code, tests and commits can cite them (`FR-…`, `ARCH-…`, `PACK-…`, `LIC-…`).
 
 Keywords: MUST / SHOULD / MAY as in RFC 2119. Everything here has been decided by the author unless it appears in the pending list of section 18.
@@ -25,7 +25,8 @@ Keywords: MUST / SHOULD / MAY as in RFC 2119. Everything here has been decided b
 | M1 Core: model, commands, resolver, history, JSON save/load, CLI `run-script` | **Done** (section 19; 134 tests) |
 | M2 Canvas and plan editing | **Done** (section 19.4; 305 tests; some keys marked ASSUMED, section 18) |
 | M2b Test feedback and look (section 19.5): previews that look final, project-wide settings, menu bar, tool bar, Affinity-style handles, antialiased rendering, Latte theme, logo and app icon | **Done** (406 tests; open interpretations in section 18) |
-| M3 – M7 | Not started (M3 follows M2b) |
+| M3 Electric symbols: pack and library, circuits and numbering, symbol tools, Alt-place, pipette, quickbar, circuit focus, copy settings, select by filter, wall-facing sockets, label solver, anchoring | **Done** (section 19.6; 579 tests; open interpretations in section 18) |
+| M4 – M7 | Not started |
 
 ---
 
@@ -178,8 +179,8 @@ Resizing and rotating work **like in Affinity**, with handles around the selecti
 - **FR-SYM-1** v0.1 symbol set (Belgian pack): **interrupteur**, **interrupteur va-et-vient**, **lampe**, **prise**, plus the **TGBT** and **compteur kWh** markers (shown in green on the plan).
 - **FR-SYM-2** Placement by tool key, repeatable (stay in the tool until Esc). A symbol gets the **active circuit** and the **next free index** automatically.
 - **FR-SYM-3** **Alt-place**: placing with Alt held reuses the previous index (links the new symbol to the same point). Workflow: place a lamp, then Alt-place its switches, release Alt, place the next lamp (new index), etc.
-- **FR-SYM-4** **Wall orientation**: a socket auto-rotates on placement to face away from the nearest wall within a snap distance, back against the wall's drawn edge, i.e. the centreline offset by half the wall's page weight at the sheet scale (preview before click). Manual rotation (`R`) overrides and sticks.
-- **FR-SYM-5** **Label placement with basic collision solving.** On placement or move, the circuit label and the `xN` badge are placed by scoring candidate positions around the symbol (e.g. 8 directions): a symbol near a wall gets its labels **away from the wall**; when several symbols are **stacked or close together**, labels go to a **free side** (avoiding other labels, symbols and walls). A label the user has dragged is pinned and never moved by the solver. No global optimisation in v0.1.
+- **FR-SYM-4** **Wall orientation**: a socket auto-rotates on placement to face away from the nearest wall within a snap distance, back against the wall's drawn edge, i.e. the centreline offset by half the wall's page weight at the sheet scale (preview before click). The anchor is placed so that the **back of the artwork** touches that edge (half the wall weight plus the depth of the back). Manual rotation (`R`) overrides and sticks, and a pipetted rotation counts as manual.
+- **FR-SYM-5** **Label placement with basic collision solving.** On placement or move, the circuit label and the `xN` badge are placed by scoring candidate positions around the symbol (e.g. 8 directions): a symbol near a wall gets its labels **away from the wall**; when several symbols are **stacked or close together**, labels go to a **free side** (avoiding other labels, symbols and walls). A label the user has dragged is pinned and never moved by the solver. No global optimisation in v0.1. **As built:** the solver runs when a symbol is placed (in the same undo step) and on the command "Replacer les étiquettes" (selected symbols, or all unpinned ones); moving a symbol keeps its labels at the same offset, which keeps a stack tidy; "Libérer les étiquettes fixées à la main" unpins.
 - **FR-SYM-6** `count` is editable in the Properties panel and by shortcut: `X` then a digit (e.g. `X` `3`).
 - **FR-SYM-7** Changing a symbol's circuit: select (click or box), then `C` + letter (e.g. `C` `H`). With nothing selected, `C` + letter sets the **active circuit**. Reassigned symbols take the next free index in the new circuit (links inside the moved selection are preserved).
 - **FR-SYM-8** Renumbering: palette command **"Compacter la numérotation"** removes gaps in a circuit's indices (or all circuits). No default key. Deleting never renumbers automatically (stable indices).
@@ -207,7 +208,7 @@ Real walls often hold a vertical stack at one spot: a socket near the floor, a s
 
 - **FR-QB-1** **Quickbar**: 9 slots, activated by the keys **1–9**. A slot holds a **tool preset**: a tool plus its properties (e.g. "lampe", "prise count 3", "porte 800 mm", "mur de poids 2 mm"). The active circuit is not part of a preset (it stays under the author's control with `C`).
 - **FR-QB-2** The quickbar is displayed on screen (numbered slots, current one highlighted). A preset is shown with its symbol/tool icon.
-- **FR-QB-3** How slots are filled, and whether the quickbar belongs to the project or to the user: **undecided**, section 18 (WA-1).
+- **FR-QB-3** How slots are filled, and whether the quickbar belongs to the project or to the user: **undecided**, section 18 (WA-1). **Interim, as built:** palette commands "Barre rapide : mémoriser l'outil actuel dans la case N" fill a slot from the current tool and its settings, "vider toutes les cases" empties them; slots live as long as the window and are not saved.
 - **FR-FOCUS-1** **Circuit focus** lives in the side panel that already lists the circuits with their colours. A **click** on a circuit greys it out (out of focus: its symbols are drawn light grey, are not box-selectable and are not picked by the pipette; they stay visible). A second click restores it.
 - **FR-FOCUS-2** **Double-click** a circuit = **solo**: every other circuit is greyed out. Double-clicking the solo circuit again **restores the visibility state from before the solo**.
 - **FR-FOCUS-3** Focus is **view state** (per window, not in the Document, not exported, not undoable; ARCH-7). Walls, openings and labels are never affected by it.
@@ -270,13 +271,13 @@ Vim-like: a **Normal** mode (select) and tool states. `Esc` always returns to Se
 - **FR-CFG-2** **One project per window; the tabs of a window are the étages of that project** (plus the unifilaire tab). `Ctrl+N` opens another window. **Autosave and silent recovery** at next launch replace any "save changes?" dialog.
 
 ### 7.2 Menu bar (FR-MENU)
-- **FR-MENU-1** A menu bar sits at the top of the window with **Fichier**, **Édition**, **Étage**, **Affichage** and **Projet**. Every command is also in the command palette; a menu item shows its shortcut only when the author approved one (WA-1).
-- **FR-MENU-2** **Fichier**: Nouveau projet (nouvelle fenêtre) `Ctrl+N`, Ouvrir…, Enregistrer, Enregistrer sous…. **Édition**: Annuler `Ctrl+Z`, Rétablir `Ctrl+Y`, Couper, Copier, Coller, Dupliquer, Supprimer, Tout sélectionner. **Étage**: Nouvel étage `Ctrl+T`, Dupliquer, Dupliquer avec les symboles, Renommer `F2`, Supprimer.
+- **FR-MENU-1** A menu bar sits at the top of the window with **Fichier**, **Édition**, **Symboles**, **Étage**, **Affichage** and **Projet**. Every command is also in the command palette; a menu item shows its shortcut only when the author approved one (WA-1).
+- **FR-MENU-2** **Fichier**: Nouveau projet (nouvelle fenêtre) `Ctrl+N`, Ouvrir…, Enregistrer, Enregistrer sous…. **Édition**: Annuler `Ctrl+Z`, Rétablir `Ctrl+Y`, Couper, Copier, Coller, Dupliquer, Supprimer, Tout sélectionner, Copier les propriétés, Coller les propriétés. **Symboles**: Pipette `A`, Replacer les étiquettes, Libérer les étiquettes fixées à la main, Compacter la numérotation, Ancrer à un symbole, Détacher. **Étage**: Nouvel étage `Ctrl+T`, Dupliquer, Dupliquer avec les symboles, Renommer `F2`, Supprimer.
 - **FR-MENU-3** **Affichage** holds the checkable display options: **Étage fantôme** and **Repères A4 / A3** (project-wide, FR-PROJ-1), **Accrochage**, **Barre d'outils** (FR-TOOLBAR). **Projet** holds **Réglages du projet**, which shows the project settings in the Properties panel (no popup window for settings).
 - **FR-MENU-4** Check items always reflect the current state and are undoable when they change the project.
 
 ### 7.3 Tool bar (FR-TOOLBAR)
-- **FR-TOOLBAR-1** A vertical **tool bar** at the left of the canvas, like Affinity, with one **icon-only** button per tool (select, wall, door, window, stair, grey block, text; the symbol tools join it in M3). It exists for users who do not know the hot keys; the keyboard stays the fast path.
+- **FR-TOOLBAR-1** A vertical **tool bar** at the left of the canvas, like Affinity, with one **icon-only** button per tool (select, wall, door, window, stair, grey block, text, then lamp, switch, two-way switch, socket; the TGBT and kWh markers are placed from the palette). It exists for users who do not know the hot keys; the keyboard stays the fast path.
 - **FR-TOOLBAR-2** Each button has a **tooltip with the tool name and its hot key** (e.g. "Mur (W)"). The active tool is shown as pressed and follows the keyboard (pressing `W` presses the wall button).
 - **FR-TOOLBAR-3** The tool bar can be hidden and shown from the Affichage menu; it is **visible by default**. The choice is a user preference stored outside the project (`user://prefs.json`).
 - **FR-TOOLBAR-4** The icons are SVG files drawn for Giroflée (assets under `assets/icons/`, CC0), duotone, rendered at the needed size from the theme colours (so they follow the palette and stay crisp at any UI scale).
@@ -400,8 +401,8 @@ packs/
 
 ### 11.2 Symbol SVG authoring convention
 - Files are standard SVG (y down, as every SVG tool produces). Core converts on load.
-- Origin (0,0) = the symbol's anchor point. For wall-attached symbols the anchor sits on the wall face and the artwork extends **toward the bottom of the page** at rotation 0 (i.e. rotation 0 = "facing down"); rotations are then applied counter-clockwise in Core's math axes.
-- `viewBox` centred on the anchor, units = mm at 1:1 world size.
+- Origin (0,0) = the symbol's anchor point. For wall-attached symbols (`"attach": "wall"` in the pack) the **back** of the artwork extends toward the bottom of the page and the symbol **faces up** at rotation 0; the placement puts the back against the wall's drawn edge. Rotations are applied counter-clockwise in Core's math axes.
+- `viewBox` centred on the anchor, **units = millimetres on the printed page** (a lamp of 6 units is 6 mm on paper whatever the scale of the étage). Core multiplies by the sheet scale and by the project `symbol_scale` (FR-CSYM-2); a symbol therefore keeps its paper size when the scale changes.
 - Stroke-only artwork using `currentColor` (so the app applies colour/theme).
 - No CSS, no embedded images, no text elements, no nested transforms.
 
@@ -532,7 +533,7 @@ Every milestone is done only when its tests (WA-6, section 15.3) pass in CI.
 
 **Pending (per WA-1 nothing below is implemented until the author answers):**
 1. **Rule values:** the author fills in `packs/belgium/rules.template.json` later. Until then every rule reports "règle non configurée". Catalogue extras (e.g. the 25 A breaker the author owns) are added on need.
-2. **Quickbar:** how a slot is filled (e.g. pick up with the pipette, then assign) and whether the quickbar belongs to the project or to the user.
+2. **Quickbar:** the interim fill-from-the-palette behaviour of FR-QB-3 is in; the final way to fill a slot (e.g. pick up with the pipette, then assign) and whether the quickbar belongs to the project or to the user are still to decide.
 3. **Keys or gestures** for: anchoring (FR-STACK-2), copy/paste settings (FR-EDIT-7). They exist only as palette commands for now.
 4. **Keys marked ASSUMED in M2, to confirm or change:** `Delete` / `Backspace` (delete selection), `Ctrl+A` (select all), arrow keys (nudge by one grid step), `Enter` and double-click (finish a wall), `Backspace` while drawing a wall (remove the last point), double-click on a text (edit it), wheel step sizes (60 px pan, 1.15 zoom).
 5. **Save and open keys:** `Ctrl+S` / `Ctrl+O` (or others) are not bound; "Enregistrer", "Enregistrer sous…" and "Ouvrir un projet…" are palette commands only.
@@ -543,6 +544,8 @@ Every milestone is done only when its tests (WA-6, section 15.3) pass in CI.
 11. **Logo fidelity:** the vector logo is a hand-built approximation of the supplied raster (petal shape, notch and inner lines are close, not identical); a drawn SVG would replace it.
 12. **Renderer change:** the project now needs a Vulkan-capable GPU for smooth diagonals (older machines fall back to OpenGL with the lighter outline-based smoothing). Confirm this is acceptable for the target users.
 10. **Rotation cursor:** Godot has no rotation cursor; a generic cursor is used until a custom one is drawn.
+13. **M3 interpretations to confirm:** (a) the label solver is not re-run automatically when a symbol moves (FR-SYM-5 says "placement or move"); (b) `X` then a digit sets counts 1 to 9 only (more through the Properties panel); (c) `C` then a letter with symbols selected moves them to that circuit, and only changes the active circuit when nothing is selected; (d) digit keys 1 to 9 are read from the physical key so the top row works on AZERTY; (e) the pipette on a wall also sets the project wall weight (an undoable change); (f) a grey block has no style property yet, so "Copier les propriétés" has nothing to copy from it; (g) the placeholder artwork of the pack symbols is a first approximation of the author's plans and is to be redrawn.
+14. **Anchoring gesture:** "Ancrer à un symbole" asks for a click on the parent symbol; nothing draws the link between a stack's symbols yet.
 
 ## 19. Implementation notes (kept in sync with the code)
 
@@ -659,3 +662,21 @@ No third-party plugin was needed. `tests/visual/test_antialiasing.gd` (opt-in, n
 
 **Known limits.** The Windows executable keeps the default icon (embedding needs `rcedit`, section 18); the engine's default font is still used (M7); the rotation handle uses a generic cursor.
 
+
+### 19.6 M3: electric symbols, as built
+
+**Pack and library.** `packs/belgium/` and `packs/common/` (CC0) each have `pack.json` and `symbols.json`; the types are lamp, switch, two-way switch, socket (attach `wall`) and the TGBT and kWh markers (no circuit, drawn green). `SymbolLibrary.for_pack(id)` loads and caches them from `res://packs` (includes with override, loop detection, problems listed instead of crashing). `SvgArt.parse` implements the SVG subset of section 11.3 strictly and refuses the rest with a message. An unknown type in a project is drawn as a visible placeholder, never dropped.
+
+**Geometry and drawing.** `SymbolGeometry` turns pack artwork into world shapes (page mm × sheet scale × `symbol_scale`, y flipped, then the symbol's mirrors and rotation); `EntityGeometry` has the symbol cases for drawing, bounds and picking, `PlanRenderer` draws symbols above walls. Colours come from `CircuitPalette` (Okabe-Ito, colour-blind safe) when the window asks for circuit colours; dimmed circuits are grey. `LabelSolver` places each label and `xN` badge on the best of eight spots around the symbol, clear of walls, openings, symbols, texts and earlier labels; the badge starts opposite the label; pinned labels stay and block others.
+
+**Numbering.** `Numbering` lists circuits in use, finds the next free index (highest + 1), groups symbols into points, counts points per circuit (a symbol whose pack type does not count, or a triple socket's `count`, never adds a point), plans "Compacter la numérotation" and the reassignment of a selection to another circuit with links kept. Paste and "Dupliquer l'étage avec les symboles" give fresh indices and keep pairs together.
+
+**Anchoring.** `AnchorRules` keeps `anchor_offset == pos - parent.pos` true: `entity.add`, `update`, `move` and `remove` refuse a missing parent, a non-symbol parent, a parent on another étage, a self-anchor or a cycle; moving a parent carries its descendants; moving a child alone updates its offset; removing a parent leaves the children in place, unanchored. `Document.check_integrity` and the loader check the same rules. Copy takes the descendants along, and a child copied without its parent loses its anchor. Rotating and scaling carry stacks and recompute the offsets.
+
+**Editor.** `SymbolTool` (tool names are the pack type ids; keys `L`, `I`, `Shift+I`, `P`), Alt-place through `EditorModel.last_placed`, wall orientation of sockets, `A` pipette, `C` letter and `X` digit as two-key commands with the status bar prompting, `Quickbar`, `StyleProps` (copy settings), `Selectors` (select by filter), `AnchorTool`, label dragging in the select tool (pins the label), `CircuitFocus` with `EditorModel.focus_*` (bumps `view_revision`, not `revision`, so the project does not become "modified" and the canvas cache refreshes). All of it is also in the palette (`EditorCommands`).
+
+**Windows.** Tool bar gains four symbol buttons with icons; `CircuitPanel` lists the circuits (colour, letter, points; click greys, double-click isolates); `QuickbarView` shows the nine slots above the status bar; the status bar shows the active circuit and count; the Properties panel shows a symbol's circuit, index, count and height (its type is not editable).
+
+**Tests.** `test_svg_art`, `test_symbol_library`, `test_symbol_geometry`, `test_numbering_and_circuits`, `test_anchoring`, `test_label_solver`, `test_symbol_tools`, `test_symbol_commands`, and in the real window `test_symbol_ui` and `test_m3_workflow` (a room, a lamp, its Alt-placed switch, sockets against the wall, a triple socket, circuit change by keyboard, pipette). `tests/visual` has an opt-in screenshot of the electrical plan with and without circuit focus.
+
+**Known limits.** The pack artwork is a first approximation to be redrawn from the author's plans; the TGBT and kWh markers have no toolbar button; the unifilaire (M4) does not exist yet; stack links are not drawn.
