@@ -25,4 +25,6 @@ Always use `tools/run-tests.sh`, not bare GUT: GUT silently skips a test script 
 - Golden files: after a deliberate change to the file format or to a scenario, run `tools/regen-golden.sh` and review the diff.
 - Core (`src/core/`) is pure `RefCounted`, no `Node`, headless-testable. UI never mutates the document directly (SRD ARCH-2).
 - Tabs for indentation in `.gd` files. French for user-facing strings (via `tr()`), English for code and comments.
-- Layout: `src/core` model and logic, `src/cli` headless CLI, `src/ui` scenes, `packs/` data (CC0), `tests/unit`, `tests/integration`, `tests/replays`, `tests/support`.
+- Layout: `src/core` model, commands, rendering (`render/`) and geometry (`geometry/`); `src/editor` editor logic without widgets (model, tools, input routing, palette); `src/cli` headless CLI; `src/ui` widgets; `packs/` data (CC0); `tests/unit`, `tests/integration` (real window, replayed input), `tests/visual` (opt-in screenshots), `tests/replays`, `tests/support` (`TestKit`, `EditorKit`, `UiHarness`, `ReplayPlayer`).
+- UI code never mutates the document: widgets call `EditorModel`, which goes through the `Session` (commands). Editor behaviour is tested through `EditorKit` / `UiHarness`, not by poking widgets.
+- Key bindings: only the ones approved in SRD section 7; anything the SRD marks ASSUMED is listed in section 18 for the author to confirm.

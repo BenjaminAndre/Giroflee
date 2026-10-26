@@ -7,7 +7,7 @@ extends RefCounted
 ##     "events": [
 ##       { "frame": 0, "type": "key", "key": "L", "pressed": true, "mods": ["shift"] },
 ##       { "frame": 2, "type": "mouse_motion", "pos": [100, 80] },
-##       { "frame": 3, "type": "mouse_button", "button": "left", "pressed": true, "pos": [100, 80] },
+##       { "frame": 3, "type": "mouse_button", "button": "left", "pressed": true, "pos": [100, 80], "double_click": false },
 ##       { "frame": 4, "type": "wheel", "direction": "up", "pos": [100, 80], "mods": ["ctrl"] } ] }
 ##
 ## Time is counted in rendered frames, not milliseconds, so replays are deterministic.
@@ -61,7 +61,9 @@ func _to_input_event(ev: Dictionary) -> InputEvent:
 			_apply_mods(motion, ev)
 			return motion
 		"mouse_button":
-			return _button_event(ev, _button_index(str(ev.get("button", "left"))), _flag(ev, "pressed", true))
+			var pressed_button: InputEventMouseButton = _button_event(ev, _button_index(str(ev.get("button", "left"))), _flag(ev, "pressed", true))
+			pressed_button.double_click = _flag(ev, "double_click", false)
+			return pressed_button
 		"wheel":
 			var wheel: MouseButton = MOUSE_BUTTON_WHEEL_UP
 			match str(ev.get("direction", "up")):

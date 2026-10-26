@@ -1,6 +1,6 @@
 # Giroflée — Software Requirements Document
 
-Status: **draft 0.5** · Progress: see section 0.1 · Language of this document: English · Language of the product: French (v0.1)
+Status: **draft 0.6** · Progress: see section 0.1 · Language of this document: English · Language of the product: French (v0.1)
 Audience: the author, and Claude (as the implementing agent). Technical notes are mixed in on purpose and marked **[TECH]**. Requirements are numbered so code, tests and commits can cite them (`FR-…`, `ARCH-…`, `PACK-…`, `LIC-…`).
 
 Keywords: MUST / SHOULD / MAY as in RFC 2119. Everything here has been decided by the author unless it appears in the pending list of section 18.
@@ -23,7 +23,8 @@ Keywords: MUST / SHOULD / MAY as in RFC 2119. Everything here has been decided b
 |---|---|
 | M0 Scaffold, CI, CLI skeleton, replay harness | **Done** (released as v0.1.1; the first real CI run, Windows export and release included, worked) |
 | M1 Core: model, commands, resolver, history, JSON save/load, CLI `run-script` | **Done** (section 19; 134 tests) |
-| M2 – M7 | Not started (M2 next) |
+| M2 Canvas and plan editing | **Done** (section 19.4; 305 tests; some keys marked ASSUMED, section 18) |
+| M3 – M7 | Not started (M3 next) |
 
 ---
 
@@ -119,7 +120,7 @@ Project
 | Entity | Properties | Notes |
 |---|---|---|
 | **Wall** | polyline points, line weight | Thick black stroke whose **weight is a page weight in mm** (default ≈ 1.4 mm), so it looks the same at any scale; it is not a world size. Corner joins (mitre) and T-junctions look clean. One default weight, per-wall override. The wall's geometry is its centreline. |
-| **Opening** (door / window) | width, hinge side, swing, flip H/V, optional `host_wall` + offset | Parametric. Snaps to walls and moves with its host wall. Rendered as grey swing sector (door) or grey rectangle (window). The wall is **not** cut. |
+| **Opening** (door / window) | width, flip H/V (the hinge side and the swing direction are the flips; no separate property), optional `host_wall` + offset | Parametric. Snaps to walls and moves with its host wall. Rendered as grey swing sector (door) or grey rectangle (window). The wall is **not** cut. |
 | **Stair** | width, step count, tread, rotation, flip | Parametric. Ladder look. |
 | **GreyBlock** | rectangle (resizable), rotation | Light grey, semi-transparent so the dot grid shows through. Stands for furniture, bathtub, a garage zone… The only generic decoration. |
 | **TextLabel** | text, rotation, role, optional font / size override | Free text: room names (blue), "Rue" / "Jardin", etc. Editable everywhere. |
@@ -481,46 +482,7 @@ Every milestone is done only when its tests (WA-6, section 15.3) pass in CI.
 1. **Rule values:** the author fills in `packs/belgium/rules.template.json` later. Until then every rule reports "règle non configurée". Catalogue extras (e.g. the 25 A breaker the author owns) are added on need.
 2. **Quickbar:** how a slot is filled (e.g. pick up with the pipette, then assign) and whether the quickbar belongs to the project or to the user.
 3. **Keys or gestures** for: anchoring (FR-STACK-2), copy/paste settings (FR-EDIT-7). They exist only as palette commands for now.
-
-## 19. Implementation notes (kept in sync with the code)
-
-### 19.1 M1: Core as built
-
-**Model.** `Document` (project) → `Sheet` (`plan` | `unifilaire`) → `Entity` (`wall`, `opening`, `stair`, `grey_block`, `text`, `symbol`). Entities are `id + type + props`, where `props` is a JSON-shaped dictionary validated and normalised by `Schema` (property kinds: `int`, `float`, `string`, `bool`, `vec2i`, `points`, `string_array`, `enum:a|b`). Entity ids are unique document-wide; only plan sheets hold entities. A symbol's `index` of **0 means "no index assigned yet"**. The `cartouche`, `board` and `circuits` sections are free dictionaries until M3/M4 give them schemas; `config` has a schema (font family, base font size, default wall weight, provisoire mark).
-
-**Commands** (`CommandRegistry`; payloads are JSON primitives, all ids client-generated):
-
-| Type | Payload |
-|---|---|
-| `sheet.add` | `id, kind, props{name,…}, index?` |
-| `sheet.update` | `id, props{partial}` (kind is immutable; ghost references are checked) |
-| `sheet.remove` | `id` (also removes its entities and its references in other sheets' ghost lists) |
-| `sheet.move` | `id, index` (tab order) |
-| `entity.add` | `sheet, items[{id,type,props}]` (all-or-nothing) |
-| `entity.update` | `sheet, items[{id,props{partial}}]` |
-| `entity.remove` | `sheet, ids[]` |
-| `entity.move` | `sheet, ids[], delta[dx,dy]` (integer mm, y up) |
-| `doc.set` / `doc.unset` | `section, key, value` (`config` is schema-checked and cannot be unset) |
-| `patch.apply` | `ops[]` (how undo and redo travel; ARCH-5) |
-
-**Patches.** A handler is a pure function `(document, payload) → BuildResult` producing primitive operations (`entity`, `sheet`, `sheet_order`, `value`), each with its `before` and `after` state. `PatchApplier` is the only code that mutates a document: it checks every `before` (a stale undo or a conflicting edit is refused), applies atomically and rolls back on failure. The inverse of a patch is mechanical (reverse order, swap before/after).
-
-**Resolver and channel.** `Resolver.submit()` rejects unknown types and re-used command ids, applies, numbers (`seq`) and emits `committed(patch)`. `CommandChannel` is the interface; `InProcessChannel` is the v0.1 implementation.
-
-**Session and history.** `Session` (one user's client) owns an `IdGenerator`, a channel and a `History`. `run([commands])` is one undo step (one transaction id) and rolls back if a later command fails; `undo()`/`redo()` send `patch.apply` commands through the channel. No-op commands (empty patches) are accepted but not recorded. Selection, viewport, active circuit and circuit focus are not part of the Session's document state (ARCH-7).
-
-**File.** `DocumentIO` + `JsonWriter` produce `*.giroflee`: sorted keys, two-space indent, scalar arrays such as `[x, y]` on one line, floats lossless, entities sorted by id, sheets in tab order, trailing newline. Loading is **strict**: unknown keys, unknown properties, bad values, duplicate ids, entities on a non-plan sheet and dangling ghost references are errors (nothing is silently dropped). `format_version` is 1; `Migrations` upgrades older files step by step and refuses newer ones.
-
-**CLI.** `run-script <script.json> [--project <file>] [--out <file>] [--print]` applies a script (`{"format_version":1,"commands":[…]}`) through the same resolver as the GUI. Commands without an id get `script-<n>`.
-
-### 19.2 Tests added with M1 (TEST-1, TEST-2)
-- Unit tests for schema, migrations, id generator, JSON writer, document I/O, each command family, patches/applier, resolver, session/history, CLI.
-- **Scenario + golden:** `tests/scenarios/basic_floor.json` run through the CLI must reproduce `tests/golden/basic_floor.giroflee` byte for byte; every golden file must reload and re-save unchanged. Regenerate with `tools/regen-golden.sh`, then review the diff.
-- **Property tests:** seeded random command sequences (8 seeds × 80 steps) must (a) keep the document consistent after every step, (b) undo back through every intermediate state byte for byte and redo forward again, (c) be deterministic, (d) round-trip through save/load at every state.
-- `tests/unit/test_scripts_load.gd` fails if any script under `src/` does not parse under the strict typing rules.
-
-### 19.3 Conventions learned the hard way
-- Strict typing rejects `int()`, `bool()`, `float()` applied to a `Variant`; read values into typed locals instead (see `JsonUtil`).
-- Test scripts may use `@warning_ignore_start("unsafe_call_argument")`: GUT's `assert_*` functions take untyped arguments, and passing a dictionary lookup to them is otherwise an error.
-- After adding a script with a new `class_name`, refresh the class cache with `godot --headless --path . --import` (`tools/run-tests.sh` and `tools/regen-golden.sh` do it).
-- Files in `tests/` whose name starts with `test_` are collected by GUT; helpers use another prefix (`tests/support/kit_helpers.gd`).
+4. **Keys marked ASSUMED in M2, to confirm or change:** `Delete` / `Backspace` (delete selection), `Ctrl+A` (select all), arrow keys (nudge by one grid step), `Enter` and double-click (finish a wall), `Backspace` while drawing a wall (remove the last point), double-click on a text (edit it), wheel step sizes (60 px pan, 1.15 zoom).
+5. **Save and open keys:** `Ctrl+S` / `Ctrl+O` (or others) are not bound; "Enregistrer", "Enregistrer sous…" and "Ouvrir un projet…" are palette commands only.
+6. **Box selection semantics:** it selects entities that touch the box (not only those fully inside).
+7. **Palette command for the page fit:** none (the author declined "zoom to content"); the page is fitted when an étage is first shown.

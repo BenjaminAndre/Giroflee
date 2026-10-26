@@ -37,7 +37,7 @@ func test_add_each_entity_type_with_defaults() -> void:
 	assert_eq(symbol["circuit"], "")
 	assert_eq(symbol["index"], 0, "0 means no index assigned yet")
 	var door: Dictionary = TestKit.entity_props(_doc(), "d")
-	assert_eq(door["hinge"], "left")
+	assert_eq(door["flip_h"], false, "H flips the door; there is no separate hinge property (DRY)")
 	assert_eq(_doc().check_integrity(), "")
 
 
@@ -111,6 +111,18 @@ func test_move_shifts_every_point_and_position() -> void:
 	assert_true(result.ok, result.error)
 	assert_eq(TestKit.entity_props(_doc(), "w")["points"], [[100, -50], [1100, -50], [1100, 450]])
 	assert_eq(TestKit.entity_props(_doc(), "sym")["pos"], [110, -30])
+
+
+func test_moving_a_wall_carries_its_hosted_openings_exactly_once() -> void:
+	TestKit.add_wall(s, "s1", "w", [[0, 0], [4000, 0]])
+	TestKit.add_entity(s, "s1", "door", "opening", {"kind": "door", "pos": [1000, 0], "width_mm": 900, "host_wall": "w", "host_offset_mm": 1000})
+	TestKit.add_entity(s, "s1", "other", "opening", {"kind": "window", "pos": [3000, 0], "width_mm": 1200})
+	assert_true(s.run_one("entity.move", {"sheet": "s1", "ids": ["w"], "delta": [0, 100]}).ok)
+	assert_eq(TestKit.entity_props(_doc(), "door")["pos"], [1000, 100], "hosted door follows the wall")
+	assert_eq(TestKit.entity_props(_doc(), "other")["pos"], [3000, 0], "an unhosted opening stays")
+	# selecting both the wall and its door must not move the door twice
+	assert_true(s.run_one("entity.move", {"sheet": "s1", "ids": ["w", "door"], "delta": [50, 0]}).ok)
+	assert_eq(TestKit.entity_props(_doc(), "door")["pos"], [1050, 100])
 
 
 func test_move_uses_math_axes_and_integers() -> void:

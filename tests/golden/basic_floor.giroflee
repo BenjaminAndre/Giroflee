@@ -21,7 +21,6 @@
           "props": {
             "flip_h": false,
             "flip_v": false,
-            "hinge": "left",
             "host_offset_mm": 0,
             "host_wall": "",
             "kind": "door",
@@ -143,7 +142,8 @@
         "name": "Rez",
         "paper_h_mm": 297,
         "paper_w_mm": 420,
-        "scale_den": 50
+        "scale_den": 50,
+        "title_pos_mm": [366, 34]
       }
     },
     {
@@ -170,7 +170,8 @@
         "name": "Étage",
         "paper_h_mm": 297,
         "paper_w_mm": 420,
-        "scale_den": 50
+        "scale_den": 50,
+        "title_pos_mm": [366, 34]
       }
     },
     {
@@ -187,7 +188,8 @@
         "name": "Cave",
         "paper_h_mm": 297,
         "paper_w_mm": 420,
-        "scale_den": 50
+        "scale_den": 50,
+        "title_pos_mm": [366, 34]
       }
     }
   ]

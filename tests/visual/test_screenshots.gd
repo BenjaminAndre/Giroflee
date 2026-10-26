@@ -1,0 +1,96 @@
+extends GutTest
+@warning_ignore_start("unsafe_call_argument")
+## Opt-in visual check: drives the real window and saves what it renders as PNG files in
+## user://screenshots/. Needs a display, so it is not part of the default (headless) suite:
+##   godot --path . -s addons/gut/gut_cmdln.gd -gexit -gdir=res://tests/visual
+
+const OUT_DIR: String = "user://screenshots"
+
+var h: UiHarness
+
+
+func before_each() -> void:
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT_DIR))
+	h = await UiHarness.create(self)
+
+
+func _shot(name: String) -> void:
+	for i: int in 3:
+		await get_tree().process_frame
+	var image: Image = h.window.get_viewport().get_texture().get_image()
+	var path: String = "%s/%s.png" % [OUT_DIR, name]
+	image.save_png(path)
+	gut.p("screenshot: %s" % ProjectSettings.globalize_path(path))
+
+
+func _room() -> void:
+	h.key("W")
+	h.click(Vector2(3000, 3000))
+	h.click(Vector2(11000, 3000))
+	h.click(Vector2(11000, 9000))
+	h.click(Vector2(3000, 9000))
+	h.click(Vector2(3000, 3000))
+	h.key("D")
+	h.click(Vector2(6000, 3100))
+	h.key("F")
+	h.click(Vector2(11100, 6000))
+	h.key("E")
+	h.click(Vector2(8000, 6000))
+	h.key("S")
+	h.drag(Vector2(4000, 7000), Vector2(6000, 8200))
+	h.key("Escape")
+	h.key("Escape")
+
+
+func test_screenshot_room() -> void:
+	if DisplayServer.get_name() == "headless":
+		pending("needs a display")
+		return
+	_room()
+	await h.play(self)
+	h.model().add_text(Vector2(5000, 5000), "Salon", "room")
+	await _shot("room")
+	assert_true(true)
+
+
+func test_screenshot_selection_handles() -> void:
+	if DisplayServer.get_name() == "headless":
+		pending("needs a display")
+		return
+	_room()
+	await h.play(self)
+	h.click(Vector2(7000, 3000))
+	await h.play(self)
+	await _shot("selected_wall")
+	assert_true(true)
+
+
+func test_screenshot_placement_preview_and_palette() -> void:
+	if DisplayServer.get_name() == "headless":
+		pending("needs a display")
+		return
+	_room()
+	h.key("D")
+	h.move(Vector2(9000, 3100))
+	await h.play(self)
+	await _shot("door_preview")
+	h.key("Escape")
+	h.key("P", ["ctrl"])
+	await h.play(self)
+	h.window.palette._field.text = "etage"
+	h.window.palette._field.text_changed.emit("etage")
+	await _shot("palette")
+	assert_true(true)
+
+
+func test_screenshot_ghost_view() -> void:
+	if DisplayServer.get_name() == "headless":
+		pending("needs a display")
+		return
+	_room()
+	await h.play(self)
+	h.model().duplicate_sheet(false)
+	h.model().toggle_ghost()
+	h.model().set_active_sheet(h.model().doc().sheet_order[1])
+	await _shot("ghost")
+	assert_true(true)

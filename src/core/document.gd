@@ -11,6 +11,10 @@ var cartouche: Dictionary = {}
 var board: Dictionary = {}
 var circuits: Dictionary = {}
 var sheet_order: Array[String] = []
+## Bumped by every applied patch; derived caches (SpatialIndex) are keyed on it. Not saved.
+var revision: int = 0
+## Derived data cache: sheet id -> {"revision": int, "index": SpatialIndex}.
+var spatial_cache: Dictionary = {}
 ## Sheet id -> Sheet.
 var sheets: Dictionary = {}
 ## Entity id -> id of the sheet that holds it (entity ids are unique document-wide).

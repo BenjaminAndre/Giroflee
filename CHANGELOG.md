@@ -13,8 +13,16 @@ Versions are `vMAJOR.MINOR.PATCH`: `MAJOR.MINOR` come from the `VERSION` file, `
 - Tests: 134 in total, including golden-file scenarios (`tests/scenarios`, `tests/golden`, `tools/regen-golden.sh`) and seeded property tests that undo/redo through every intermediate state byte for byte.
 - `CHANGELOG.md`; SRD draft 0.5 with progress table, working agreement WA-7 (keep this changelog up to date) and implementation notes.
 
+- **M2 canvas and plan editing** (SRD section 19.4): the editor window (étage tabs, canvas, properties panel, status bar, command palette), drawing of walls (mitred, rings without holes), doors and windows that attach to walls and follow them, stairs, grey blocks and text; selection with box, move, vertex and corner handles; snapping to the grid and to wall endpoints and midpoints; copy, cut, paste, duplicate; new, duplicate, rename, delete étage; ghost view; page frame with numbered columns and lettered rows; dot grid and A4/A3 hints; pan and zoom; autosave with silent recovery; open / save as through the palette; `Ctrl+N` opens another window.
+- Rendering core: one `DrawList` per sheet (the future SVG/PDF/PNG backends read the same list), `PlanTheme` with the colours measured on the author's plans, `SpatialIndex` (picking 200× faster at 2000 entities).
+- Editor logic separated from widgets (`EditorModel`, tools, `EditorInput`), so the whole editor is testable headlessly.
+- Tests: 305 in total, including replay tests that drive the real window, a 2000-entity performance check and an opt-in screenshot test (`tests/visual`).
+
 ### Changed
 - CLI: `run-script` moved from "planned" to implemented.
+- Schema: the opening property `hinge` was removed (the flips already carry it: DRY); sheets gained `title_pos_mm`; the golden file was regenerated.
+- `entity.move` now also moves the openings hosted by a moved wall; `entity.remove` frees the openings of a removed wall.
+- `tests/golden` and `.gutconfig.json`: the default suite runs `tests/unit` and `tests/integration` only; `tests/visual` is opt-in.
 
 ## [0.1.1] — M0 scaffold
 

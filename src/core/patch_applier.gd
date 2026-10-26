@@ -8,6 +8,7 @@ extends RefCounted
 ## state it recorded as `before`, otherwise it is rejected (stale undo, conflicting edit).
 ## Returns "" on success or an error message (and leaves the document untouched).
 static func apply(doc: Document, ops: Array[Dictionary], check_before: bool = true) -> String:
+	doc.revision += 1
 	for i: int in ops.size():
 		var error: String = _apply_one(doc, ops[i], check_before)
 		if not error.is_empty():

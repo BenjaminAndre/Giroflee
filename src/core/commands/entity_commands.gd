@@ -92,10 +92,23 @@ static func remove(doc: Document, payload: Dictionary) -> BuildResult:
 		return BuildResult.fail(check)
 	var ids: Array = payload["ids"]
 	var ops: Array[Dictionary] = []
+	var removed: Dictionary = {}
 	for raw_id: Variant in ids:
 		var entity_id: String = raw_id
 		var entity: Entity = sheet.entities[entity_id]
+		removed[entity_id] = true
 		ops.append(Patch.entity_op(sheet.id, entity_id, entity.snapshot(), null))
+	# openings that stay but lose their host wall become free-standing (no dangling reference)
+	for entity_id: String in sheet.sorted_entity_ids():
+		var entity: Entity = sheet.entities[entity_id]
+		if removed.has(entity_id) or entity.type != "opening":
+			continue
+		var host: String = entity.props["host_wall"]
+		if not host.is_empty() and removed.has(host):
+			var freed: Dictionary = entity.props.duplicate(true)
+			freed["host_wall"] = ""
+			freed["host_offset_mm"] = 0
+			ops.append(Patch.entity_op(sheet.id, entity_id, entity.snapshot(), {"type": entity.type, "props": freed}))
 	return BuildResult.success(ops)
 
 
@@ -113,30 +126,36 @@ static func move(doc: Document, payload: Dictionary) -> BuildResult:
 	var d: Array = delta["value"]
 	var dx: int = d[0]
 	var dy: int = d[1]
-	var ids: Array = payload["ids"]
+	var requested: Array = payload["ids"]
+	var ids: Array = _with_hosted_openings(sheet, requested)
 	var ops: Array[Dictionary] = []
 	if dx == 0 and dy == 0:
 		return BuildResult.success(ops)
 	for raw_id: Variant in ids:
 		var entity_id: String = raw_id
 		var entity: Entity = sheet.entities[entity_id]
-		var moved: Dictionary = entity.props.duplicate(true)
-		if entity.type == "wall":
-			var points: Array = moved["points"]
-			var shifted: Array = []
-			for point: Variant in points:
-				var p: Array = point
-				var px: int = p[0]
-				var py: int = p[1]
-				shifted.append([px + dx, py + dy])
-			moved["points"] = shifted
-		else:
-			var pos: Array = moved["pos"]
-			var x: int = pos[0]
-			var y: int = pos[1]
-			moved["pos"] = [x + dx, y + dy]
+		var moved: Dictionary = EntityMover.shifted_props(entity.type, entity.props, dx, dy)
 		ops.append(Patch.entity_op(sheet.id, entity_id, entity.snapshot(), {"type": entity.type, "props": moved}))
 	return BuildResult.success(ops)
+
+
+## `ids` plus the openings hosted by any wall in `ids` (they move with their wall, SRD 5.1),
+## without duplicates. Added ids come in sorted order, so the result is deterministic.
+static func _with_hosted_openings(sheet: Sheet, ids: Array) -> Array:
+	var result: Array = ids.duplicate()
+	var present: Dictionary = {}
+	for raw_id: Variant in ids:
+		present[raw_id] = true
+	for entity_id: String in sheet.sorted_entity_ids():
+		if present.has(entity_id):
+			continue
+		var entity: Entity = sheet.entities[entity_id]
+		if entity.type != "opening":
+			continue
+		var host: String = entity.props["host_wall"]
+		if not host.is_empty() and present.has(host):
+			result.append(entity_id)
+	return result
 
 
 static func _plan_sheet(doc: Document, payload: Dictionary) -> Sheet:

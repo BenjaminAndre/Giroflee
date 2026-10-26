@@ -23,7 +23,6 @@ const ENTITY_SPECS: Dictionary = {
 		"rotation": {"kind": "float", "default": 0.0},
 		"flip_h": {"kind": "bool", "default": false},
 		"flip_v": {"kind": "bool", "default": false},
-		"hinge": {"kind": "enum:left|right", "default": "left"},
 		"host_wall": {"kind": "string", "default": ""},
 		"host_offset_mm": {"kind": "int", "default": 0},
 	},
@@ -78,6 +77,7 @@ const SHEET_SPEC: Dictionary = {
 	"frame_rows": {"kind": "int", "default": 8},
 	"grid_step_mm": {"kind": "int", "default": 100},
 	"hints": {"kind": "bool", "default": true},
+	"title_pos_mm": {"kind": "vec2i", "default": [366, 34]},
 	"ghost_on": {"kind": "bool", "default": false},
 	"ghost_sheets": {"kind": "string_array", "default": []},
 }
