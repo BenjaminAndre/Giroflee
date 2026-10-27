@@ -470,7 +470,7 @@ Added later **on need**. Seed content for `catalog.json`:
 - **FR-BRAND-1** The mark is a **four-petal wallflower** (the giroflée): rounded petals, two yellow and two green alternating around a small dark centre with a white ring, outlined in Latte text colour `#4c4f69`; yellow `#F5D928`, green `#319447` (conductor colours, decided in the logo discussion). No lettering.
 - **FR-BRAND-2** It exists as **SVG** (`assets/branding/logo.svg`, with the four fine inner lines) and a **simplified SVG without them** for small sizes, and must stay readable at **32 × 32 px** (an automated test checks that the rendered 32 px mark still contains both colours and the outline).
 - **FR-BRAND-3** Generated assets (committed): PNG sizes, a multi-size **`icon.ico`** (16 to 256 px), and a **boot splash** that shows the Giroflée mark **together with the Godot logo** ("Fait avec Godot", Godot logo CC BY 4.0, attribution in `third_party/NOTICE`) on a Latte background. The window icon is set at run time.
-- **FR-BRAND-4** Limitation: embedding the `.ico` into the Windows executable needs the `rcedit` tool at export time, which the Linux CI does not have; until that is solved the exe keeps the default icon and the window and splash use the logo. (Pending decision, section 18.)
+- **FR-BRAND-4** The Windows executable carries the logo: the export preset sets `application/icon` to `icon.ico` and `modify_resources`, and the release job installs Wine and `rcedit` (v2.0.0) and points Godot at them through its editor settings. A failed rcedit step fails the release instead of silently shipping the default icon. First verified by the next CI release (it cannot be run on a Windows development machine the same way).
 
 ## 13. Export and persistence
 
@@ -559,7 +559,7 @@ Every milestone is done only when its tests (WA-6, section 15.3) pass in CI.
 6. **Box selection semantics:** it selects entities that touch the box (not only those fully inside).
 7. **Palette command for the page fit:** none (the author declined "zoom to content"); the page is fitted when an étage is first shown.
 8. **M2b interpretations to confirm:** (a) feedback "the wall just draw as soon as we start" is read as *the wall should look like a wall from the first segment on* (FR-PREV), not as "commit each segment immediately"; (b) A4/A3 hints are made project-wide together with the frame, title and ghost switch (the author listed the first three; hints are a display aid of the same kind); (c) paper size and scale stay per sheet.
-9. **Executable icon:** how to embed `icon.ico` in the Windows exe from the Linux CI (needs `rcedit`, normally via Wine), or build the Windows export on a Windows runner.
+9. **Executable icon:** done through Wine and `rcedit` in the Linux release job (FR-BRAND-4); to confirm on the first CI release, otherwise build the export on a Windows runner.
 11. **Logo fidelity:** the vector logo is a hand-built approximation of the supplied raster (petal shape, notch and inner lines are close, not identical); a drawn SVG would replace it.
 12. **Renderer change:** the project now needs a Vulkan-capable GPU for smooth diagonals (older machines fall back to OpenGL with the lighter outline-based smoothing). Confirm this is acceptable for the target users.
 10. **Rotation cursor:** Godot has no rotation cursor; a generic cursor is used until a custom one is drawn.

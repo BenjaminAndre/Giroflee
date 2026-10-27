@@ -29,6 +29,7 @@ Versions are `vMAJOR.MINOR.PATCH`: `MAJOR.MINOR` come from the `VERSION` file, `
 - Tests: 681 in total.
 
 ### Changed
+- The Windows executable now carries the logo (export preset icon and product details; the release job installs Wine and rcedit).
 - `sheet.add`, `sheet.move` and `sheet.remove` keep the unifilaire first and unique; `doc.set` validates `board`, `circuits` and `cartouche`; the status bar zoom is relative to the sheet scale; the golden scenario includes the unifilaire.
 - CI: releases are normal releases marked **Latest** (pre-releases can never be "Latest"), with a version-less `Giroflee-windows.zip` asset for a stable latest-download link; a tag pushed by hand (`vX.Y.Z`) builds and publishes that exact version. Existing v0.1.1 to v0.1.3 are untouched.
 - CLI: `run-script` moved from "planned" to implemented.
