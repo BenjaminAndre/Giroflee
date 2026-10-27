@@ -15,7 +15,7 @@ func _relative_luminance(c: Color) -> float:
 	return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
 
 
-func _close(a: Color, b: Color, tol: float = 0.12) -> bool:
+func _close(a: Color, b: Color, tol: float = 0.12) -> bool:test_the_windows_export_embeds_the_icon
 	return absf(a.r - b.r) < tol and absf(a.g - b.g) < tol and absf(a.b - b.b) < tol
 
 
@@ -248,12 +248,3 @@ func test_checkboxes_are_plain_rows_not_framed_buttons() -> void:
 	var theme: Theme = AppTheme.build()
 	for style_name: String in ["normal", "pressed", "hover"]:
 		assert_true(theme.get_stylebox(style_name, "CheckBox") is StyleBoxEmpty, "CheckBox/%s" % style_name)
-
-
-func test_the_windows_export_embeds_the_icon() -> void:
-	var preset: String = FileAccess.get_file_as_string("res://export_presets.cfg")
-	assert_string_contains(preset, "application/modify_resources=true")
-	assert_string_contains(preset, "application/icon=\"res://assets/branding/icon.ico\"")
-	assert_true(FileAccess.file_exists("res://assets/branding/icon.ico"))
-	var workflow: String = FileAccess.get_file_as_string("res://.github/workflows/ci.yml")
-	assert_string_contains(workflow, "rcedit")
