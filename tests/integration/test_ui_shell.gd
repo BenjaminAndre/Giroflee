@@ -70,11 +70,11 @@ func test_menu_items_do_not_register_global_shortcuts() -> void:
 
 func test_etage_menu_creates_and_duplicates_and_deletes() -> void:
 	_press("Étage", "Nouvel étage")
-	assert_eq(h.model().doc().sheet_order.size(), 2)
+	assert_eq(h.model().doc().plan_ids().size(), 2)
 	_press("Étage", "Dupliquer l'étage")
-	assert_eq(h.model().doc().sheet_order.size(), 3)
+	assert_eq(h.model().doc().plan_ids().size(), 3)
 	_press("Étage", "Supprimer l'étage")
-	assert_eq(h.model().doc().sheet_order.size(), 2)
+	assert_eq(h.model().doc().plan_ids().size(), 2)
 
 
 func test_edition_menu_undoes_and_redoes() -> void:
@@ -158,7 +158,7 @@ func test_editing_the_frame_in_the_panel_changes_the_project_for_every_etage() -
 	assert_not_null(spin)
 	spin.value = 9.0
 	assert_eq(h.model().doc().config["frame_cols"], 9)
-	h.model().set_active_sheet(h.model().doc().sheet_order[0])
+	h.model().set_active_sheet(h.model().doc().plan_ids()[0])
 	var numbers: int = 0
 	for op: DrawOp in h.model().page_list().ops:
 		if op.layer == "frame" and op.kind == DrawOp.TEXT and op.text.is_valid_int():

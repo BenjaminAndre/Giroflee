@@ -1,6 +1,6 @@
 # Giroflée — Software Requirements Document
 
-Status: **draft 0.8** · Progress: see section 0.1 · Language of this document: English · Language of the product: French (v0.1)
+Status: **draft 0.9** · Progress: see section 0.1 · Language of this document: English · Language of the product: French (v0.1)
 Audience: the author, and Claude (as the implementing agent). Technical notes are mixed in on purpose and marked **[TECH]**. Requirements are numbered so code, tests and commits can cite them (`FR-…`, `ARCH-…`, `PACK-…`, `LIC-…`).
 
 Keywords: MUST / SHOULD / MAY as in RFC 2119. Everything here has been decided by the author unless it appears in the pending list of section 18.
@@ -26,7 +26,8 @@ Keywords: MUST / SHOULD / MAY as in RFC 2119. Everything here has been decided b
 | M2 Canvas and plan editing | **Done** (section 19.4; 305 tests; some keys marked ASSUMED, section 18) |
 | M2b Test feedback and look (section 19.5): previews that look final, project-wide settings, menu bar, tool bar, Affinity-style handles, antialiased rendering, Latte theme, logo and app icon | **Done** (406 tests; open interpretations in section 18) |
 | M3 Electric symbols: pack and library, circuits and numbering, symbol tools, Alt-place, pipette, quickbar, circuit focus, copy settings, select by filter, wall-facing sockets, label solver, anchoring | **Done** (section 19.6; 579 tests; open interpretations in section 18) |
-| M4 – M7 | Not started |
+| M4 Unifilaire tab, étage tab order, unifilaire derivation and rendering, board editor, cartouche | **Done** (section 19.7; 681 tests; open interpretations in section 18) |
+| M5 – M7 | Not started |
 
 ---
 
@@ -282,6 +283,13 @@ Vim-like: a **Normal** mode (select) and tool states. `Esc` always returns to Se
 - **FR-TOOLBAR-3** The tool bar can be hidden and shown from the Affichage menu; it is **visible by default**. The choice is a user preference stored outside the project (`user://prefs.json`).
 - **FR-TOOLBAR-4** The icons are SVG files drawn for Giroflée (assets under `assets/icons/`, CC0), duotone, rendered at the needed size from the theme colours (so they follow the palette and stay crisp at any UI scale).
 
+### 7.4 Tabs (FR-TAB)
+- **FR-TAB-1** Every project opened in the editor has exactly one **unifilaire** sheet (the document model tolerates none, so scripts and tests can stay minimal, but never two). It is created with a new project, added to older files when they are opened (format 3, FR-FILE-2), and is always the **first** sheet. It cannot be removed, moved or duplicated.
+- **FR-TAB-2** The unifilaire is shown apart from the étage tabs: an **accent-coloured button at the far left** of the tab row (filled when it is the active sheet), then the tabs of the étages. It is not an ordinary tab, so it can never be dragged among them.
+- **FR-TAB-3** **Étage tabs can be reordered** by dragging a tab (the author asked for it; the gesture is the usual tab drag) and by the palette commands "Déplacer l'étage vers la gauche" and "… vers la droite" (no key assigned, WA-1). A reorder is one undo step and is saved with the project. No étage can be placed before the unifilaire.
+- **FR-TAB-4** A new or duplicated étage is inserted **right after the active étage** (right after the unifilaire when that is the active sheet). `Ctrl+Tab` and `Ctrl+Shift+Tab` cycle through all tabs, the unifilaire included.
+- **FR-TAB-5** On the unifilaire only the selection tool exists: drawing and symbol tools, the pipette and the quickbar are plan tools, their keys show a short notice in the status bar instead of switching tool, and their buttons in the tool bar are greyed out.
+
 ## 8. The unifilaire (FR-UNI)
 
 The unifilaire is a **sheet kind** whose content is the sum of **computed** and **user-edited** parts.
@@ -302,6 +310,15 @@ The unifilaire is a **sheet kind** whose content is the sum of **computed** and 
 ### 8.3 Editing UX
 - **FR-UNI-1** The computed part is read-only on the canvas (clicking jumps to the source symbol on its plan). The editable part is edited via the Properties panel and direct manipulation (drag a column to reorder, click a device to edit).
 - **FR-UNI-2** Everything the user edits survives regeneration, keyed by circuit letter / device UUID.
+- **FR-UNI-3** **Data.** `circuits[letter]` holds the optional `title`, `breaker` and `cable` (ids from the pack catalogue); an absent breaker or cable means the pack default, flagged as defaulted. `board.head` is the ordered head chain (`{id, catalog}` items, from the feed to the bus); `board.bus` is the ordered bus, each item either `{type: "circuit", letter}` or `{type: "device", id, catalog}`. The column order is the order of the circuit items in the bus. Circuits that are in use on the plans but not in the bus are appended after it in letter order and written into the bus the first time the author reorders anything. A circuit entry without symbols is a **spare** column.
+- **FR-UNI-4** **Derivation** is pure and deterministic: same document, same unifilaire. A point (group) shows its symbols in the unifilaire artwork, **controls** (switches) first, then **consumers** (lamps, sockets), with consecutive symbols of the same type collapsed into one with an `xN` badge. A group with a control and no consumer shows a red `?`. A symbol type's `role` (`control` or `consumer`) comes from the pack (`symbols.json`).
+- **FR-UNI-5** **Title proposal.** When a circuit has no stored title, the title shown is proposed from the room labels (texts of role *room*) nearest to its symbols: the two most frequent, joined by " / ". A stored title always wins.
+- **FR-UNI-6** **Rows.** The ruler runs from 1 to the larger of the pack's `ruler_min_rows` and the highest index in use; it is never capped. If the rows do not fit the page their height shrinks (down to a legible minimum), and a warning is recorded.
+- **FR-UNI-7** **Interaction.** Clicking a point selects its first symbol on its plan (the app switches to that tab). Clicking a column header or a device selects it for editing in the Properties panel; dragging it sideways reorders the bus (one undo step). The head chain, the bus devices, the circuit titles and the protections are edited in the Properties panel from the pack catalogue; the usual head chain can be inserted by one explicit command and is never added by itself.
+
+### 6.7b Cartouche as built (FR-CART-4)
+- **FR-CART-4** The cartouche is drawn at the bottom of **every** sheet, plan and unifilaire, from the pack's `cartouche.json` (cells with a label and either a project field or a text with variables). The project fields live in `cartouche` and are edited in the Properties panel when nothing is selected. Variables: `{sheet.name}`, `{page}` (position of the sheet among all, "2/4"), and the project fields as `{project.<key>}`. Resizing cells and adding or removing cells (FR-CART-1) is not built yet.
+
 
 ## 9. Report / validation view (FR-RPT)
 
@@ -412,6 +429,8 @@ packs/
 ### 11.4 Rules template
 `packs/belgium/rules.template.json` is provided with every field the v0.1 rules need, all values `null`, each with a French description and a `source` field for the RGIE article reference. The author fills it in and saves it as `rules.json`. The app MUST refuse silently to apply any rule whose value is still `null` and list it in the report as "règle non configurée" (a warning), so that a missing value never produces a false pass.
 
+`symbols.json` entries gain `"role": "control" | "consumer"` (default `consumer`; markers have none that matters). `catalog.json` is `{format_version, items: [{id, kind: breaker|differential|cable|meter, title, label, detail?}], circuit_defaults: {breaker, cable}, ruler_min_rows}`; an item is drawn with its `label` and `detail`, and `title` is its French name in the editor.
+
 ### 11.5 Initial catalogue (only what the author has used so far)
 Added later **on need**. Seed content for `catalog.json`:
 - Breakers: C16 A / 3 kA (circuits), C40 A / 3 kA (general).
@@ -457,7 +476,7 @@ Added later **on need**. Seed content for `catalog.json`:
 
 ### 13.1 Project file
 - **FR-FILE-1** Single file `*.giroflee`, **plain JSON**, UTF-8, pretty-printed with stable key order and entities sorted by id, so it diffs cleanly in git. Contains `format_version`, `pack_ref`, config, cartouche, board, circuits, sheets, entities, acknowledgements and the optional `ui` block.
-- **FR-FILE-2** `format_version` plus an explicit **migration** chain; an older file MUST open (never silently drop data). Format 2 (M2b) moves the frame, title position, ghost on/off and hints from each sheet to the project `config`; the migration takes the values of the first sheet.
+- **FR-FILE-2** `format_version` plus an explicit **migration** chain; an older file MUST open (never silently drop data). Format 2 (M2b) moves the frame, title position, ghost on/off and hints from each sheet to the project `config`; the migration takes the values of the first sheet. Format 3 (M4) adds the unifilaire sheet (FR-TAB-1) as the first sheet of a file that has none.
 - **FR-FILE-3** Autosave with silent recovery; no "save changes?" prompt.
 - **FR-FILE-4** Background images are stored beside the project (`<name>.giroflee.assets/`), referenced by relative path.
 
@@ -545,6 +564,7 @@ Every milestone is done only when its tests (WA-6, section 15.3) pass in CI.
 12. **Renderer change:** the project now needs a Vulkan-capable GPU for smooth diagonals (older machines fall back to OpenGL with the lighter outline-based smoothing). Confirm this is acceptable for the target users.
 10. **Rotation cursor:** Godot has no rotation cursor; a generic cursor is used until a custom one is drawn.
 13. **M3 interpretations to confirm:** (a) the label solver is not re-run automatically when a symbol moves (FR-SYM-5 says "placement or move"); (b) `X` then a digit sets counts 1 to 9 only (more through the Properties panel); (c) `C` then a letter with symbols selected moves them to that circuit, and only changes the active circuit when nothing is selected; (d) digit keys 1 to 9 are read from the physical key so the top row works on AZERTY; (e) the pipette on a wall also sets the project wall weight (an undoable change); (f) a grey block has no style property yet, so "Copier les propriétés" has nothing to copy from it; (g) the placeholder artwork of the pack symbols is a first approximation of the author's plans and is to be redrawn.
+15. **M4 interpretations to confirm:** (a) the accent of the unifilaire button is the theme blue; (b) the unifilaire layout (head chain stacked at the left flowing up into a horizontal bus, circuits as columns, shared row ruler) is my reading of the plans described, not a copy of the author's own unifilaire: tell me what to change; (c) the "usual head chain" command (meter, cable, 300 mA differential, cable, main breaker) is a convenience, not an automatic default; (d) the unifilaire sheet keeps `scale_den` 1 (page millimetres) and its name can be edited; (e) devices on the bus are drawn inline and do not yet draw the bracket of what they protect; (f) the cartouche grid is fixed (no resizing yet).
 14. **Anchoring gesture:** "Ancrer à un symbole" asks for a click on the parent symbol; nothing draws the link between a stack's symbols yet.
 
 ## 19. Implementation notes (kept in sync with the code)
@@ -680,3 +700,21 @@ No third-party plugin was needed. `tests/visual/test_antialiasing.gd` (opt-in, n
 **Tests.** `test_svg_art`, `test_symbol_library`, `test_symbol_geometry`, `test_numbering_and_circuits`, `test_anchoring`, `test_label_solver`, `test_symbol_tools`, `test_symbol_commands`, and in the real window `test_symbol_ui` and `test_m3_workflow` (a room, a lamp, its Alt-placed switch, sockets against the wall, a triple socket, circuit change by keyboard, pipette). `tests/visual` has an opt-in screenshot of the electrical plan with and without circuit focus.
 
 **Known limits.** The pack artwork is a first approximation to be redrawn from the author's plans; the TGBT and kWh markers have no toolbar button; the unifilaire (M4) does not exist yet; stack links are not drawn.
+
+### 19.7 M4: unifilaire, tabs, board and cartouche, as built
+
+**Sheets and tabs (FR-TAB).** `Document.unifilaire_sheet()`, `plan_ids()`; `SheetCommands` refuse a second unifilaire, removing or moving it, and any étage in the first place; `Document.check_integrity` and the loader require it first. **Format 3** adds the sheet (`id` "unifilaire", A3, scale 1) to files that lack one (`Migrations._v2_to_v3`), the golden scenario now starts with it. The editor ensures a unifilaire and at least one étage at start-up (`EditorModel._ensure_a_sheet`) and begins on the first étage. `EditorWindow` shows an accent button (`UnifilaireButton` theme variation: tinted when idle, filled blue when active) left of a `TabBar` of étages only; the bar has `drag_to_rearrange_enabled` and `deselect_enabled` (so no étage tab looks active while the unifilaire is). `active_tab_rearranged` becomes `EditorModel.move_sheet` (one undo step); palette: "Aller à l'unifilaire", "Déplacer l'étage vers la gauche / droite". `set_tool` refuses drawing tools off a plan with a notice; `ToolPalette` greys the buttons.
+
+**Pack.** `packs/belgium/catalog.json` (breakers, differentials, cables, meter, circuit defaults, the usual head, `ruler_min_rows` 8), `cartouche.json` (two rows of cells), and `role` (`control` / `consumer`) on every symbol type. `Catalog` and `CartoucheBuilder.template` read them.
+
+**Data.** `BoardSchema` validates `doc.set` on `board`, `circuits` and `cartouche` (unknown keys, wrong shapes, unknown or wrong-kind catalogue ids, duplicate letters and ids are refused). Only `circuits[letter]` fields that were chosen are stored; defaults are not written (so "defaulted" stays derivable).
+
+**Derivation.** `UnifilaireBuilder.derive(doc)` returns a `UniModel` (columns, points, items, bus, head, rows, warnings; `to_dict()` is what `giroflee-cli derive-unifilaire <project>` prints). Controls first, then consumers, consecutive same type collapsed with summed counts, `is_open()` for a control without consumer, bus order then letters in use, spares, proposed titles (`proposed_title`, most frequent nearest room labels, at most two).
+
+**Layout and drawing.** `UnifilaireLayout` places everything in page millimetres (head chain stacked at the left flowing up into the bus line, columns of 16 to 28 mm, devices 20 mm, ruler shared by all columns, rows 15 mm down to 9 mm and then squeezed with a warning); it also owns the click regions, so drawing and picking cannot disagree. `UnifilaireRenderer` draws lines, boxes, text and the pack's unifilaire artwork (`SymbolGeometry.shapes_of` / `add_shape_ops`, shared with the plan); `PlanRenderer.build` dispatches on the sheet kind; `CartoucheBuilder` draws the title block on every sheet, with the frame.
+
+**Editing.** `UnifilaireTool` (the select tool of that sheet; `Tool.render_options` carries the selection tint and the drop mark): a click on a point jumps to its first symbol on the plan, on a column header, device or head item selects it, a drag of a column or device reorders the bus. `EditorModel` gained `uni_selection` (view state, bumps `view_revision`), `materialized_bus`, `move_bus_item`, `add_spare_circuit`, `remove_spare_circuit`, `add_bus_device`, `remove_bus_device`, head chain add / move / remove, `insert_usual_head`, `set_circuit_field`, `set_cartouche_field`, `jump_to_symbol`; each is one undo step. `BoardEditor` is the Properties panel of the unifilaire (circuit title with the proposal as placeholder, breaker and cable from the catalogue, devices, head chain, warnings) and the cartouche fields, also shown when nothing is selected on a plan.
+
+**Tests.** `test_unifilaire_sheet`, `test_catalog_and_board`, `test_unifilaire_derive`, `test_unifilaire_render`, `test_cartouche`, `test_board_editing`, and in the real window `test_tabs` and `test_unifilaire_ui`; the format, the golden file and the old tests that counted sheets were updated. `tests/visual` has an opt-in screenshot of the unifilaire.
+
+**Known limits.** No report panel yet (M5): the `?`, the missing head chain and the defaulted values are only drawn, not listed; the cartouche grid is fixed; the bus bracket of what a device protects is not drawn; one page only (no scale-to-fit beyond squeezing rows and columns); circuit titles are one or two lines.

@@ -2,7 +2,7 @@
 
 Lean desktop tool to draw **domestic electrical plans** (plan de position + schéma unifilaire), built with Godot. First country pack: Belgium (RGIE). See [SRD.md](SRD.md) for the full requirements.
 
-Status: milestones M2, M2b and M3 done: you can draw walls, doors, windows, stairs, blocks and labels on several étages (menu bar, tool bar, Affinity-style handles, smooth rendering), then place lamps, switches and sockets on numbered circuits (Alt-place, pipette, quickbar, circuit focus, stacks), with undo, copy/paste, ghost view and autosave. The unifilaire comes next (M4).
+Status: milestones M2, M2b, M3 and M4 done: you can draw walls, doors, windows, stairs, blocks and labels on several étages (menu bar, tool bar, Affinity-style handles, smooth rendering), then place lamps, switches and sockets on numbered circuits (Alt-place, pipette, quickbar, circuit focus, stacks), with undo, copy/paste, ghost view and autosave. The unifilaire tab is derived from the plans, with its board (head chain, bus, circuit order) and the cartouche editable; the report and rules come next (M5).
 
 ## Build and test
 

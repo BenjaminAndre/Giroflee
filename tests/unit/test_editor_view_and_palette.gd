@@ -13,7 +13,7 @@ func test_each_etage_has_its_own_view() -> void:
 	first.zoom = 0.02
 	kit.model.new_sheet()
 	assert_ne(kit.model.view().zoom, 0.02, "a new étage starts fitted to its page")
-	kit.model.set_active_sheet(kit.doc().sheet_order[0])
+	kit.model.set_active_sheet(kit.doc().plan_ids()[0])
 	assert_eq(kit.model.view().zoom, 0.02, "the first view was remembered")
 
 
@@ -137,7 +137,7 @@ func test_palette_actions_work() -> void:
 	for entry: EditorCommands.Entry in entries:
 		if entry.id == "sheet.duplicate":
 			entry.action.call()
-	assert_eq(kit.doc().sheet_order.size(), 2)
+	assert_eq(kit.doc().plan_ids().size(), 2)
 	for entry: EditorCommands.Entry in entries:
 		if entry.id == "tool.stair":
 			entry.action.call()

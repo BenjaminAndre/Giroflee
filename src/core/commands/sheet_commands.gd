@@ -29,12 +29,20 @@ static func add(doc: Document, payload: Dictionary) -> BuildResult:
 
 	var before_order: Array = doc.sheet_order.duplicate()
 	var index: int = before_order.size()
+	if kind == "unifilaire":
+		if doc.unifilaire_sheet() != null:
+			return BuildResult.fail("the project already has a unifilaire sheet")
+		index = 0
 	if payload.has("index"):
 		if not JsonUtil.is_integral(payload["index"]):
 			return BuildResult.fail("index must be an integer")
 		index = JsonUtil.to_int(payload["index"])
 		if index < 0 or index > before_order.size():
 			return BuildResult.fail("index out of range")
+	if kind == "unifilaire" and index != 0:
+		return BuildResult.fail("the unifilaire sheet is always the first sheet")
+	if kind != "unifilaire" and index == 0 and doc.unifilaire_sheet() != null:
+		return BuildResult.fail("the first place belongs to the unifilaire sheet")
 	var after_order: Array = before_order.duplicate()
 	after_order.insert(index, sheet_id)
 
@@ -79,6 +87,8 @@ static func remove(doc: Document, payload: Dictionary) -> BuildResult:
 	var sheet: Sheet = doc.get_sheet(sheet_id)
 	if sheet == null:
 		return BuildResult.fail("sheet %s does not exist" % sheet_id)
+	if sheet.kind == "unifilaire":
+		return BuildResult.fail("the unifilaire sheet cannot be removed")
 	var ops: Array[Dictionary] = []
 	for other_id: String in doc.sheet_order:
 		if other_id == sheet_id:
@@ -107,12 +117,17 @@ static func move(doc: Document, payload: Dictionary) -> BuildResult:
 	if not JsonUtil.has_string(payload, "id") or not JsonUtil.is_integral(payload.get("index")):
 		return BuildResult.fail("sheet.move needs id and an integer index")
 	var sheet_id: String = payload["id"]
-	if doc.get_sheet(sheet_id) == null:
+	var moving: Sheet = doc.get_sheet(sheet_id)
+	if moving == null:
 		return BuildResult.fail("sheet %s does not exist" % sheet_id)
+	if moving.kind == "unifilaire":
+		return BuildResult.fail("the unifilaire sheet cannot be moved")
 	var index: int = JsonUtil.to_int(payload["index"])
 	var before_order: Array = doc.sheet_order.duplicate()
 	if index < 0 or index >= before_order.size():
 		return BuildResult.fail("index out of range")
+	if index == 0 and doc.unifilaire_sheet() != null:
+		return BuildResult.fail("the first place belongs to the unifilaire sheet")
 	var after_order: Array = before_order.duplicate()
 	after_order.erase(sheet_id)
 	after_order.insert(index, sheet_id)

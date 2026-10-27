@@ -107,7 +107,7 @@ func test_changing_the_frame_changes_every_etage() -> void:
 	kit.model.new_sheet()
 	kit.model.set_config("frame_cols", 10)
 	kit.model.set_config("frame_rows", 0)
-	for sheet_id: String in kit.doc().sheet_order:
+	for sheet_id: String in kit.doc().plan_ids():
 		var texts: Array[String] = []
 		for op: DrawOp in PlanRenderer.build(kit.doc(), sheet_id).ops:
 			if op.layer == "frame" and op.kind == DrawOp.TEXT:
@@ -119,7 +119,7 @@ func test_the_title_position_is_shared_by_every_etage() -> void:
 	kit.model.new_sheet()
 	kit.model.set_config("title_pos_mm", [100, 20])
 	var positions: Array[Vector2] = []
-	for sheet_id: String in kit.doc().sheet_order:
+	for sheet_id: String in kit.doc().plan_ids():
 		var list: DrawList = PlanRenderer.build(kit.doc(), sheet_id)
 		positions.append(list.ops[list.ops.size() - 1].points[0])
 	assert_eq(positions[0], positions[1])
@@ -129,7 +129,7 @@ func test_the_title_position_is_shared_by_every_etage() -> void:
 func test_ghost_switch_is_global_but_the_ghosted_etages_are_per_sheet() -> void:
 	kit.model.new_sheet()
 	kit.model.new_sheet()
-	var order: Array[String] = kit.doc().sheet_order
+	var order: Array[String] = kit.doc().plan_ids()
 	kit.model.set_active_sheet(order[0])
 	kit.add("wall", {"points": [[0, 0], [1000, 0]]}, "w-rez")
 	kit.model.set_active_sheet(order[1])
@@ -147,7 +147,7 @@ func test_ghost_switch_is_global_but_the_ghosted_etages_are_per_sheet() -> void:
 
 func test_first_ghost_activation_picks_the_etage_below_when_none_is_chosen() -> void:
 	kit.model.new_sheet()
-	var below: String = kit.doc().sheet_order[0]
+	var below: String = kit.doc().plan_ids()[0]
 	kit.model.toggle_ghost()
 	assert_eq(kit.sheet().props["ghost_sheets"], [below])
 
@@ -156,7 +156,7 @@ func test_hints_toggle_is_global() -> void:
 	kit.model.new_sheet()
 	kit.model.toggle_hints()
 	assert_false(kit.doc().config["hints"])
-	kit.model.set_active_sheet(kit.doc().sheet_order[0])
+	kit.model.set_active_sheet(kit.doc().plan_ids()[0])
 	assert_false(kit.doc().config["hints"], "same on every étage")
 
 
@@ -185,8 +185,7 @@ func test_config_values_are_validated() -> void:
 # --- format 2 and its migration ------------------------------------------------------------------
 
 
-func test_the_format_is_now_2_and_v1_files_migrate() -> void:
-	assert_eq(Document.CURRENT_FORMAT_VERSION, 2)
+func test_v1_files_migrate_through_every_format() -> void:
 	var loaded: DocumentIO.LoadResult = DocumentIO.load_file("res://tests/fixtures/project_v1.giroflee")
 	assert_eq(loaded.error, "", "a version 1 file still opens")
 	var doc: Document = loaded.document
@@ -198,14 +197,14 @@ func test_the_format_is_now_2_and_v1_files_migrate() -> void:
 	for sheet_id: String in doc.sheet_order:
 		var props: Dictionary = doc.get_sheet(sheet_id).props
 		assert_false(props.has("frame_cols") or props.has("ghost_on") or props.has("hints") or props.has("title_pos_mm"))
-	assert_eq(doc.get_sheet(doc.sheet_order[1]).props["ghost_sheets"], [doc.sheet_order[0]], "per-sheet ghost choice kept")
+	assert_eq(doc.get_sheet(doc.sheet_order[2]).props["ghost_sheets"], [doc.sheet_order[1]], "per-sheet ghost choice kept (the unifilaire is first)")
 	assert_eq(doc.check_integrity(), "")
 
 
-func test_a_migrated_file_saves_as_format_2_and_reloads_identically() -> void:
+func test_a_migrated_file_saves_in_the_current_format_and_reloads_identically() -> void:
 	var doc: Document = DocumentIO.load_file("res://tests/fixtures/project_v1.giroflee").document
 	var text: String = DocumentIO.to_json(doc)
-	assert_string_contains(text, "\"format_version\": 2")
+	assert_string_contains(text, "\"format_version\": 3")
 	var again: DocumentIO.LoadResult = DocumentIO.from_json(text)
 	assert_eq(again.error, "")
 	assert_eq(DocumentIO.to_json(again.document), text)
@@ -222,5 +221,5 @@ func test_a_v1_file_without_sheets_migrates_with_defaults() -> void:
 
 
 func test_a_file_from_the_future_is_still_refused() -> void:
-	var raw: Dictionary = {"format_version": 3}
+	var raw: Dictionary = {"format_version": 4}
 	assert_string_contains(DocumentIO.from_dict(raw).error, "newer version")

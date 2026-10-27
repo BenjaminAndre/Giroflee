@@ -45,6 +45,9 @@ var pending_prefix: String = ""
 ## Which circuits are greyed out in this window (view state, never saved).
 var focus: CircuitFocus = CircuitFocus.new()
 var quickbar: Quickbar = Quickbar.new()
+## What is selected on the unifilaire: {} or {"kind": "column"|"device"|"head"|"point", "letter", "index", "id"}.
+## View state like the focus: it never touches the project.
+var uni_selection: Dictionary = {}
 ## Style properties copied with "Copier les propriétés" ({} when nothing was copied).
 var settings_clipboard: Dictionary = {}
 var defaults: Dictionary = DEFAULT_DEFAULTS.duplicate()
@@ -75,7 +78,8 @@ func _init(p_session: Session) -> void:
 	session.changed.connect(_on_session_changed)
 	_ensure_a_sheet()
 	_order_seen = doc().sheet_order.duplicate()
-	if doc().sheet_order.size() > 0:
+	active_sheet_id = _first_plan_id()
+	if active_sheet_id.is_empty() and doc().sheet_order.size() > 0:
 		active_sheet_id = doc().sheet_order[0]
 	set_tool("select")
 
@@ -142,7 +146,9 @@ func snap(world: Vector2, exclude: Array = [], options: Dictionary = {}) -> Snap
 
 
 func render_options() -> Dictionary:
-	return {"overrides": tool.overrides(self), "circuit_colors": true, "dimmed": focus.dimmed_letters()}
+	var options: Dictionary = {"overrides": tool.overrides(self), "circuit_colors": true, "dimmed": focus.dimmed_letters()}
+	options.merge(tool.render_options(self), true)
+	return options
 
 
 func page_list() -> DrawList:
@@ -157,6 +163,9 @@ func preview_list() -> DrawList:
 
 
 func set_tool(name: String) -> void:
+	if name != "select" and sheet().kind != "plan":
+		notice.emit(tr("Les outils de dessin sont réservés aux plans : choisissez un étage"))
+		return
 	if tool != null:
 		tool.cancel(self)
 	tool_name = name
@@ -181,7 +190,7 @@ func set_tool(name: String) -> void:
 				tool = SymbolTool.new(name)
 			else:
 				tool_name = "select"
-				tool = SelectTool.new()
+				tool = UnifilaireTool.new() if sheet().kind == "unifilaire" else SelectTool.new()
 	changed.emit()
 
 
@@ -725,6 +734,8 @@ func set_active_sheet(sheet_id: String) -> void:
 	active_sheet_id = sheet_id
 	selection = []
 	revision += 1
+	if sheet().kind != "plan" or tool is UnifilaireTool:
+		set_tool("select")
 	sheet_changed.emit()
 	changed.emit()
 
@@ -740,6 +751,9 @@ func cycle_sheet(step: int) -> void:
 ## New étage after the active one; it inherits paper, scale, grid and frame settings.
 func new_sheet() -> void:
 	var source: Sheet = sheet()
+	if source.kind != "plan":
+		var base: String = _first_plan_id()
+		source = doc().get_sheet(base) if not base.is_empty() else source
 	var props: Dictionary = {"name": _free_name(tr("Étage"))}
 	for key: String in ["paper_w_mm", "paper_h_mm", "scale_den", "grid_step_mm"]:
 		props[key] = JsonUtil.deep_copy(source.props[key])
@@ -750,10 +764,215 @@ func new_sheet() -> void:
 		set_active_sheet(sheet_id)
 
 
+## Moves an étage to `index` in the tab order (SRD FR-TAB-3), one undo step. The first place is the
+## unifilaire's, so the index is at least 1 there.
+func move_sheet(sheet_id: String, index: int) -> CommandResult:
+	var target: int = index
+	if doc().unifilaire_sheet() != null:
+		target = maxi(target, 1)
+	target = clampi(target, 0, doc().sheet_order.size() - 1)
+	return _run("sheet.move", {"id": sheet_id, "index": target})
+
+
+# --- unifilaire and board -----------------------------------------------------------------------
+
+
+func select_uni(value: Dictionary) -> void:
+	uni_selection = value
+	view_revision += 1
+	changed.emit()
+
+
+## The bus as it is drawn, written out in full (circuits in use but not yet listed included), so that
+## an edit keeps today's order (SRD FR-UNI-3).
+func materialized_bus() -> Array:
+	var out: Array = []
+	var model: UniModel = UnifilaireBuilder.derive(doc())
+	for item: UniModel.BusItem in model.bus:
+		if item.is_device:
+			out.append({"type": "device", "id": item.id, "catalog": item.catalog})
+		else:
+			out.append({"type": "circuit", "letter": model.columns[item.column].letter})
+	return out
+
+
+func _set_board(key: String, value: Array) -> CommandResult:
+	return _run("doc.set", {"section": "board", "key": key, "value": value})
+
+
+## Drag of a column or device: the bus item at `from_index` goes to the slot `to_index` (0 to count,
+## as `UnifilaireLayout.insertion_index` gives it). One undo step.
+func move_bus_item(from_index: int, to_index: int) -> CommandResult:
+	var bus: Array = materialized_bus()
+	if from_index < 0 or from_index >= bus.size():
+		return CommandResult.failure("no such bus item")
+	var target: int = to_index - 1 if to_index > from_index else to_index
+	if target == from_index:
+		return CommandResult.success(null)
+	var moved: Variant = bus[from_index]
+	bus.remove_at(from_index)
+	bus.insert(clampi(target, 0, bus.size()), moved)
+	return _set_board("bus", bus)
+
+
+## Adds a circuit column without symbols (a spare) with the first unused letter. Returns the letter.
+func add_spare_circuit() -> String:
+	var model: UniModel = UnifilaireBuilder.derive(doc())
+	for code: int in range(65, 91):
+		var letter: String = char(code)
+		if model.column_for(letter) == null:
+			var bus: Array = materialized_bus()
+			bus.append({"type": "circuit", "letter": letter})
+			if _set_board("bus", bus).ok:
+				select_uni({"kind": "column", "letter": letter})
+				return letter
+			return ""
+	notice.emit(tr("Les 26 lettres de circuit sont déjà utilisées"))
+	return ""
+
+
+## Removes a spare (symbol-less) circuit column and what was typed for it.
+func remove_spare_circuit(letter: String) -> void:
+	var model: UniModel = UnifilaireBuilder.derive(doc())
+	var column: UniModel.Column = model.column_for(letter)
+	if column == null or not column.spare:
+		notice.emit(tr("Seul un circuit de réserve (sans symbole) peut être retiré"))
+		return
+	var bus: Array = materialized_bus()
+	var kept: Array = []
+	for raw: Variant in bus:
+		var entry: Dictionary = raw
+		if not (entry["type"] == "circuit" and entry["letter"] == letter):
+			kept.append(entry)
+	var commands: Array[Command] = [session.command("doc.set", {"section": "board", "key": "bus", "value": kept})]
+	if doc().circuits.has(letter):
+		commands.append(session.command("doc.unset", {"section": "circuits", "key": letter}))
+	var result: CommandResult = session.run(commands)
+	if result.ok:
+		select_uni({})
+	else:
+		notice.emit(result.error)
+
+
+func add_bus_device(catalog_id: String) -> void:
+	var bus: Array = materialized_bus()
+	var id: String = new_id()
+	bus.append({"type": "device", "id": id, "catalog": catalog_id})
+	if _set_board("bus", bus).ok:
+		select_uni({"kind": "device", "id": id})
+
+
+func remove_bus_device(device_id: String) -> void:
+	var kept: Array = []
+	for raw: Variant in materialized_bus():
+		var entry: Dictionary = raw
+		if not (entry["type"] == "device" and entry["id"] == device_id):
+			kept.append(entry)
+	if _set_board("bus", kept).ok:
+		select_uni({})
+
+
+func head_items() -> Array:
+	var value: Variant = doc().board.get("head", [])
+	var list: Array = value if value is Array else []
+	return list.duplicate(true)
+
+
+func add_head_item(catalog_id: String) -> void:
+	var head: Array = head_items()
+	var id: String = new_id()
+	head.append({"id": id, "catalog": catalog_id})
+	if _set_board("head", head).ok:
+		select_uni({"kind": "head", "id": id})
+
+
+func remove_head_item(item_id: String) -> void:
+	var kept: Array = []
+	for raw: Variant in head_items():
+		var entry: Dictionary = raw
+		if entry["id"] != item_id:
+			kept.append(entry)
+	if _set_board("head", kept).ok:
+		select_uni({})
+
+
+## Moves a head item one place toward the feed (-1) or toward the bus (+1).
+func move_head_item(item_id: String, step: int) -> void:
+	var head: Array = head_items()
+	for i: int in head.size():
+		var entry: Dictionary = head[i]
+		if entry["id"] == item_id:
+			var target: int = i + step
+			if target < 0 or target >= head.size():
+				return
+			head.remove_at(i)
+			head.insert(target, entry)
+			_set_board("head", head)
+			return
+
+
+## The usual head chain of the pack (meter, cable, differential, cable, main breaker), as an explicit
+## command; it never happens by itself (SRD FR-UNI-7).
+func insert_usual_head() -> void:
+	var items: Array = []
+	for catalog_id: String in Catalog.for_pack(doc().pack_ref).usual_head:
+		items.append({"id": new_id(), "catalog": catalog_id})
+	_set_board("head", items)
+
+
+## Sets one field (`title`, `breaker` or `cable`) of a circuit; an empty value goes back to the
+## default (the proposed title, the pack's breaker and cable).
+func set_circuit_field(letter: String, field: String, value: String) -> CommandResult:
+	var current: Dictionary = {}
+	if doc().circuits.has(letter):
+		var stored: Dictionary = doc().circuits[letter]
+		current = stored.duplicate(true)
+	if value.is_empty():
+		current.erase(field)
+	else:
+		current[field] = value
+	return _run("doc.set", {"section": "circuits", "key": letter, "value": current})
+
+
+func set_cartouche_field(key: String, value: String) -> CommandResult:
+	return _run("doc.set", {"section": "cartouche", "key": key, "value": value})
+
+
+## Click on a point of the unifilaire: shows its first symbol on its plan (FR-UNI-7).
+func jump_to_symbol(symbol_id: String) -> void:
+	var sheet_id: String = doc().sheet_id_of_entity(symbol_id)
+	if sheet_id.is_empty():
+		return
+	set_active_sheet(sheet_id)
+	set_selection([symbol_id])
+
+
+func show_unifilaire() -> void:
+	var uni: Sheet = doc().unifilaire_sheet()
+	if uni != null:
+		set_active_sheet(uni.id)
+
+
+## Palette: one place to the left (-1) or right (+1) among the étages.
+func shift_sheet(step: int) -> void:
+	if sheet().kind != "plan":
+		notice.emit(tr("L'unifilaire reste toujours le premier onglet"))
+		return
+	var index: int = doc().sheet_order.find(active_sheet_id)
+	var target: int = index + step
+	var first: int = 1 if doc().unifilaire_sheet() != null else 0
+	if target < first or target >= doc().sheet_order.size():
+		return
+	move_sheet(active_sheet_id, target)
+
+
 ## Copies the active étage after itself: the architecture only, or everything with `with_symbols`
 ## (SRD FR-EDIT-4). Texts (room names) are architecture.
 func duplicate_sheet(with_symbols: bool) -> void:
 	var source: Sheet = sheet()
+	if source.kind != "plan":
+		notice.emit(tr("L'unifilaire ne se duplique pas"))
+		return
 	var props: Dictionary = source.props.duplicate(true)
 	props["name"] = _free_name("%s (%s)" % [source.display_name(), tr("copie")])
 	var new_sheet_id: String = new_id()
@@ -775,7 +994,10 @@ func duplicate_sheet(with_symbols: bool) -> void:
 
 
 func delete_sheet() -> void:
-	if doc().sheet_order.size() <= 1:
+	if sheet().kind != "plan":
+		notice.emit(tr("L'unifilaire ne se supprime pas"))
+		return
+	if _plan_count() <= 1:
 		notice.emit(tr("Impossible de supprimer le dernier étage"))
 		return
 	var order: Array[String] = doc().sheet_order.duplicate()
@@ -853,10 +1075,32 @@ func _run(type: String, payload: Dictionary) -> CommandResult:
 	return result
 
 
+## A project in the editor always has its unifilaire (first) and at least one étage.
 func _ensure_a_sheet() -> void:
-	if doc().sheet_order.is_empty():
+	var added: bool = false
+	if doc().unifilaire_sheet() == null:
+		session.run_one("sheet.add", {"id": new_id(), "kind": "unifilaire", "props": Document.unifilaire_props()})
+		added = true
+	if _plan_count() == 0:
 		session.run_one("sheet.add", {"id": new_id(), "kind": "plan", "props": {"name": tr("Rez")}})
+		added = true
+	if added:
 		session.history.clear()
+
+
+func _plan_count() -> int:
+	var count: int = 0
+	for sheet_id: String in doc().sheet_order:
+		if doc().get_sheet(sheet_id).kind == "plan":
+			count += 1
+	return count
+
+
+func _first_plan_id() -> String:
+	for sheet_id: String in doc().sheet_order:
+		if doc().get_sheet(sheet_id).kind == "plan":
+			return sheet_id
+	return ""
 
 
 func _free_name(base: String) -> String:

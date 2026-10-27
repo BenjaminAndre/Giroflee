@@ -41,14 +41,19 @@ static func count_text(entity: Entity) -> String:
 static func world_shapes(entity: Entity, ctx: RenderContext) -> Array[Dictionary]:
 	var def: SymbolLibrary.Def = def_of(entity, ctx)
 	var k: float = unit(ctx)
-	var out: Array[Dictionary] = []
 	var origin: Vector2 = EntityGeometry.vec(entity.props["pos"])
 	var rotation: float = entity.props["rotation"]
 	var flip_h: bool = entity.props["flip_h"]
 	var flip_v: bool = entity.props["flip_v"]
 	if def == null:
 		return _placeholder(origin, rotation, k)
-	for shape: SvgArt.Shape in def.plan.shapes:
+	return shapes_of(def.plan, origin, rotation, flip_h, flip_v, k)
+
+
+## The strokes and fills of `art` placed at `origin` (world mm, y up) with `k` world mm per page mm.
+static func shapes_of(art: SvgArt, origin: Vector2, rotation: float, flip_h: bool, flip_v: bool, k: float) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for shape: SvgArt.Shape in art.shapes:
 		var points: PackedVector2Array = PackedVector2Array()
 		for p: Vector2 in shape.points:
 			points.append(EntityGeometry.to_world(origin, rotation, flip_h, flip_v, Vector2(p.x * k, -p.y * k)))
@@ -87,7 +92,13 @@ static func add_ops(entity: Entity, ctx: RenderContext, ghost: bool, out: DrawLi
 		return
 	var def: SymbolLibrary.Def = def_of(entity, ctx)
 	var color: Color = _body_color(entity, def, ctx)
-	for shape: Dictionary in world_shapes(entity, ctx):
+	add_shape_ops(world_shapes(entity, ctx), color, def, "symbols", entity.id, out)
+	_add_labels(entity, def, ctx, color, out)
+
+
+## Draw ops for `shapes` (from `shapes_of`): `color` is the body colour, an explicit marker colour wins.
+static func add_shape_ops(shapes: Array[Dictionary], color: Color, def: SymbolLibrary.Def, layer: String, entity_id: String, out: DrawList) -> void:
+	for shape: Dictionary in shapes:
 		var points: PackedVector2Array = shape["points"]
 		var closed: bool = shape["closed"]
 		var stroke: bool = shape["stroke"]
@@ -96,10 +107,9 @@ static func add_ops(entity: Entity, ctx: RenderContext, ghost: bool, out: DrawLi
 		if filled and points.size() >= 3:
 			var fill_color: Color = _shape_color(shape["fill_color"], color, def)
 			fill_color.a = shape["fill_opacity"]
-			out.add(DrawOp.polygon(points, fill_color, "symbols", entity.id))
+			out.add(DrawOp.polygon(points, fill_color, layer, entity_id))
 		if stroke:
-			out.add(DrawOp.polyline(points, _shape_color(shape["stroke_color"], color, def), width, "symbols", entity.id, closed))
-	_add_labels(entity, def, ctx, color, out)
+			out.add(DrawOp.polyline(points, _shape_color(shape["stroke_color"], color, def), width, layer, entity_id, closed))
 
 
 ## Where the circuit label is centred relative to the symbol when it was never placed explicitly:

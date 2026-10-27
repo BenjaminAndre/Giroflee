@@ -7,6 +7,10 @@ extends RefCounted
 ## `run()` returns the process exit code and collects the text to print in `output`,
 ## so that tests can drive it without a process.
 ##
+## derive-unifilaire <project.giroflee>
+##   Prints the unifilaire derived from the plans and the board of a project as JSON (columns, points,
+##   bus, head chain, rows, warnings; SRD section 8). Nothing is written.
+##
 ## run-script <script.json> [--project <file>] [--out <file>] [--print]
 ##   Applies the commands of a script to a project (a new empty one unless --project is
 ##   given), through the same resolver as the GUI. Script format:
@@ -25,7 +29,6 @@ const EXIT_USAGE: int = 2
 ## Subcommands announced by the SRD and not implemented yet (milestone in brackets).
 const PLANNED: Dictionary = {
 	"export-svg": "M6",
-	"derive-unifilaire": "M4",
 	"validate": "M5",
 }
 
@@ -47,6 +50,8 @@ func run(args: PackedStringArray) -> int:
 			return EXIT_OK
 		"run-script":
 			return _run_script(args.slice(1))
+		"derive-unifilaire":
+			return _derive_unifilaire(args.slice(1))
 		_:
 			if PLANNED.has(args[0]):
 				output.append("%s: not implemented yet (planned for %s)" % [args[0], PLANNED[args[0]]])
@@ -58,10 +63,23 @@ func run(args: PackedStringArray) -> int:
 
 func _usage() -> void:
 	output.append("usage: %s <subcommand> [args]" % COMMAND_NAME)
-	var names: PackedStringArray = PackedStringArray(["help", "version", "run-script"])
+	var names: PackedStringArray = PackedStringArray(["help", "version", "run-script", "derive-unifilaire"])
 	names.append_array(PackedStringArray(PLANNED.keys()))
 	output.append("subcommands: %s" % ", ".join(names))
 	output.append("run-script <script.json> [--project <file>] [--out <file>] [--print]")
+	output.append("derive-unifilaire <project.giroflee>")
+
+
+func _derive_unifilaire(args: PackedStringArray) -> int:
+	if args.size() != 1 or args[0].begins_with("--"):
+		output.append("derive-unifilaire needs one project file")
+		return EXIT_USAGE
+	var loaded: DocumentIO.LoadResult = DocumentIO.load_file(args[0])
+	if loaded.document == null:
+		output.append("%s: %s" % [args[0], loaded.error])
+		return EXIT_FAILURE
+	output.append(JsonWriter.stringify(UnifilaireBuilder.derive(loaded.document).to_dict()))
+	return EXIT_OK
 
 
 func _run_script(args: PackedStringArray) -> int:

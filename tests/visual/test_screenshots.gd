@@ -145,3 +145,38 @@ func test_screenshot_electrical_plan() -> void:
 	h.window.circuits.click_circuit("A", false)
 	await _shot("electrical_plan_focus")
 	assert_true(true)
+
+
+func test_screenshot_unifilaire() -> void:
+	if DisplayServer.get_name() == "headless":
+		pending("needs a display")
+		return
+	var model: EditorModel = h.model()
+	model.add_text(Vector2(5000, 5000), "Salon", "room")
+	model.add_text(Vector2(9000, 5000), "Cuisine", "room")
+	var circuits: Array = [["A", 5200, 5200], ["B", 9200, 5200], ["C", 5000, 4000]]
+	for entry: Array in circuits:
+		var letter: String = entry[0]
+		var x: int = entry[1]
+		var y: int = entry[2]
+		for i: int in 3:
+			model.add_entities([{"id": "%s-l%d" % [letter, i], "type": "symbol", "props": {"symbol_type": "lamp", "pos": [x + i * 400, y], "circuit": letter, "index": i + 1}}])
+		model.add_entities([{"id": "%s-sw" % letter, "type": "symbol", "props": {"symbol_type": "switch", "pos": [x - 600, y], "circuit": letter, "index": 1}}])
+		model.add_entities([{"id": "%s-so" % letter, "type": "symbol", "props": {"symbol_type": "socket", "pos": [x, y + 600], "circuit": letter, "index": 4, "count": 3}}])
+	model.add_entities([{"id": "C-open", "type": "symbol", "props": {"symbol_type": "switch", "pos": [4000, 4000], "circuit": "C", "index": 5}}])
+	var catalog: Catalog = Catalog.for_pack("belgium")
+	var head: Array = []
+	for item_id: String in catalog.usual_head:
+		head.append({"id": "h-%s" % item_id, "catalog": item_id})
+	model.session.run_one("doc.set", {"section": "board", "key": "head", "value": head})
+	model.session.run_one("doc.set", {"section": "board", "key": "bus", "value": [
+		{"type": "circuit", "letter": "C"}, {"type": "device", "id": "d1", "catalog": "diff_40a_30ma_a"},
+		{"type": "circuit", "letter": "A"}, {"type": "circuit", "letter": "B"}, {"type": "circuit", "letter": "F"}]})
+	model.set_cartouche_field("address", "Rue de l'Exemple 1, 5000 Namur")
+	model.set_cartouche_field("owner", "Jeanne Exemple")
+	model.set_circuit_field("A", "title", "Salon / Cuisine")
+	model.show_unifilaire()
+	model.select_uni({"kind": "column", "letter": "A"})
+	h.model().view().fit_rect(Rect2(0, 0, 420, 297))
+	await _shot("unifilaire")
+	assert_true(true)

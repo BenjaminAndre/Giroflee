@@ -21,6 +21,7 @@ var circuits: CircuitPanel
 var quickbar_view: QuickbarView
 var palette: PaletteOverlay
 var tabs: TabBar
+var uni_button: Button
 var status_hint: Label
 var status_info: Label
 
@@ -52,11 +53,23 @@ func _init() -> void:
 	root.add_child(menu_bar)
 
 	var top: HBoxContainer = HBoxContainer.new()
+	top.add_theme_constant_override("separation", 0)
 	root.add_child(top)
+	uni_button = Button.new()
+	uni_button.theme_type_variation = "UnifilaireButton"
+	uni_button.toggle_mode = true
+	uni_button.focus_mode = Control.FOCUS_NONE
+	uni_button.text = "Unifilaire"
+	uni_button.tooltip_text = "Schéma unifilaire (toujours le premier onglet)"
+	uni_button.pressed.connect(_on_unifilaire_pressed)
+	top.add_child(uni_button)
 	tabs = TabBar.new()
 	tabs.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tabs.tab_alignment = TabBar.ALIGNMENT_LEFT
+	tabs.drag_to_rearrange_enabled = true
+	tabs.deselect_enabled = true
 	tabs.tab_changed.connect(_on_tab_changed)
+	tabs.active_tab_rearranged.connect(_on_tab_rearranged)
 	tabs.gui_input.connect(_on_tabs_input)
 	top.add_child(tabs)
 	_add_button = Button.new()
@@ -411,14 +424,19 @@ func _notification(what: int) -> void:
 # --- tabs ---------------------------------------------------------------------------------
 
 
+## The étage tabs (the unifilaire has its own button, FR-TAB-2).
 func _sync_tabs() -> void:
 	_syncing_tabs = true
 	tabs.clear_tabs()
-	for sheet_id: String in model.doc().sheet_order:
+	var plans: Array[String] = model.doc().plan_ids()
+	for sheet_id: String in plans:
 		tabs.add_tab(model.doc().get_sheet(sheet_id).display_name())
-	var index: int = model.doc().sheet_order.find(model.active_sheet_id)
-	if index >= 0:
-		tabs.current_tab = index
+	tabs.current_tab = plans.find(model.active_sheet_id)
+	var uni: Sheet = model.doc().unifilaire_sheet()
+	uni_button.visible = uni != null
+	if uni != null:
+		uni_button.text = uni.display_name()
+		uni_button.set_pressed_no_signal(uni.id == model.active_sheet_id)
 	_syncing_tabs = false
 	_update_title()
 
@@ -426,10 +444,31 @@ func _sync_tabs() -> void:
 func _on_tab_changed(index: int) -> void:
 	if _syncing_tabs or model == null:
 		return
-	var order: Array[String] = model.doc().sheet_order
-	if index >= 0 and index < order.size():
-		model.set_active_sheet(order[index])
+	var plans: Array[String] = model.doc().plan_ids()
+	if index >= 0 and index < plans.size():
+		model.set_active_sheet(plans[index])
 		canvas.grab_focus()
+
+
+func _on_unifilaire_pressed() -> void:
+	var uni: Sheet = model.doc().unifilaire_sheet()
+	if uni != null:
+		model.set_active_sheet(uni.id)
+		_sync_tabs()
+		canvas.grab_focus()
+
+
+## A tab was dragged to `index_to` among the étages: that is a new order (FR-TAB-3).
+func _on_tab_rearranged(index_to: int) -> void:
+	if _syncing_tabs or model == null:
+		return
+	var plans: Array[String] = model.doc().plan_ids()
+	var moved: String = model.active_sheet_id
+	if plans.has(moved):
+		# the bar already shows the new order; tell the document and let it redraw the tabs
+		var first: int = model.doc().sheet_order.find(plans[0]) if not plans.is_empty() else 0
+		model.move_sheet(moved, first + index_to)
+		_sync_tabs()
 
 
 func _on_tabs_input(event: InputEvent) -> void:
@@ -458,11 +497,15 @@ func _on_text_requested(world_pos: Vector2, entity_id: String, initial: String) 
 
 
 func _on_rename_requested(sheet_id: String) -> void:
-	var index: int = model.doc().sheet_order.find(sheet_id)
-	if index < 0:
+	var rect: Rect2
+	var index: int = model.doc().plan_ids().find(sheet_id)
+	if index >= 0:
+		rect = tabs.get_tab_rect(index)
+		rect.position += tabs.global_position - global_position
+	elif model.doc().get_sheet(sheet_id) != null and model.doc().get_sheet(sheet_id).kind == "unifilaire":
+		rect = Rect2(uni_button.global_position - global_position, uni_button.size)
+	else:
 		return
-	var rect: Rect2 = tabs.get_tab_rect(index)
-	rect.position += tabs.global_position - global_position
 	var commit: Callable = func(text: String) -> void: model.rename_sheet(sheet_id, text)
 	_begin_inline(Rect2(rect.position, Vector2(maxf(rect.size.x, 180.0), rect.size.y)), model.doc().get_sheet(sheet_id).display_name(), 14, commit)
 
@@ -524,7 +567,8 @@ func _update_status() -> void:
 	if model.hover_snap != null and model.hover_snap.kind != SnapEngine.NONE:
 		snap_text = "  ·  %s" % ("sommet" if model.hover_snap.kind == SnapEngine.VERTEX else ("milieu" if model.hover_snap.kind == SnapEngine.MIDPOINT else "grille"))
 	var pos: Vector2 = model.hover
-	status_info.text = "%s  ·  x %s  y %s  ·  zoom %d %%%s " % [circuit_text, Fmt.length(pos.x), Fmt.length(pos.y), roundi(view.zoom * 100.0 / 0.1), snap_text]
+	var scale_den: float = model.ctx().scale
+	status_info.text = "%s  ·  x %s  y %s  ·  zoom %d %%%s " % [circuit_text, Fmt.length(pos.x), Fmt.length(pos.y), roundi(view.zoom * scale_den * 20.0), snap_text]
 	_update_title()
 
 

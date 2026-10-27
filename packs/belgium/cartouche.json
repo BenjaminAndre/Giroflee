@@ -1,0 +1,17 @@
+{
+  "format_version": 1,
+  "rows": [
+    [
+      {"label": "Adresse de l'installation", "key": "address", "weight": 4},
+      {"label": "Propriétaire", "key": "owner", "weight": 3},
+      {"label": "Installateur", "key": "installer", "weight": 3},
+      {"label": "Organisme de contrôle", "key": "inspector", "weight": 3}
+    ],
+    [
+      {"label": "Plan", "text": "{sheet.name}", "weight": 4},
+      {"label": "Page", "text": "{page}", "weight": 1},
+      {"label": "Date", "key": "date", "weight": 2},
+      {"label": "Signature", "key": "signature", "weight": 3}
+    ]
+  ]
+}

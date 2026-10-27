@@ -23,9 +23,9 @@ func test_set_config_rejects_unknown_key_and_wrong_type() -> void:
 	assert_false(s.run_one("doc.set", {"section": "config", "key": "provisoire_mark", "value": 1}).ok)
 
 
-func test_set_free_sections_accept_json_values() -> void:
+func test_set_sections_accept_values_of_their_shape() -> void:
 	assert_true(s.run_one("doc.set", {"section": "cartouche", "key": "owner", "value": "Jeanne"}).ok)
-	assert_true(s.run_one("doc.set", {"section": "board", "key": "head", "value": {"meter": "kWh", "items": [1, 2]}}).ok)
+	assert_true(s.run_one("doc.set", {"section": "board", "key": "head", "value": [{"id": "h1", "catalog": "meter_kwh_27a"}]}).ok)
 	assert_true(s.run_one("doc.set", {"section": "circuits", "key": "A", "value": {"title": "Salon"}}).ok)
 	assert_eq(s.document().cartouche["owner"], "Jeanne")
 	assert_eq(s.document().circuits["A"], {"title": "Salon"})
@@ -55,9 +55,8 @@ func test_unset() -> void:
 
 
 func test_set_stores_a_copy_not_a_reference() -> void:
-	var value: Dictionary = {"a": [1, 2]}
-	s.run_one("doc.set", {"section": "board", "key": "k", "value": value})
-	var inner: Array = value["a"]
-	inner.append(3)
-	var stored: Dictionary = s.document().board["k"]
-	assert_eq(stored["a"], [1, 2], "later edits of the caller's object do not reach the document")
+	var value: Dictionary = {"title": "Salon", "breaker": "breaker_c16_3ka"}
+	s.run_one("doc.set", {"section": "circuits", "key": "A", "value": value})
+	value["title"] = "changed"
+	var stored: Dictionary = s.document().circuits["A"]
+	assert_eq(stored["title"], "Salon", "later edits of the caller's object do not reach the document")

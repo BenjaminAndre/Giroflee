@@ -17,9 +17,22 @@
     "title_pos_mm": [366, 34],
     "wall_weight_mm": 1.4
   },
-  "format_version": 2,
+  "format_version": 3,
   "pack_ref": "belgium",
   "sheets": [
+    {
+      "entities": [],
+      "id": "unifilaire",
+      "kind": "unifilaire",
+      "props": {
+        "ghost_sheets": [],
+        "grid_step_mm": 10,
+        "name": "Unifilaire",
+        "paper_h_mm": 297,
+        "paper_w_mm": 420,
+        "scale_den": 1
+      }
+    },
     {
       "entities": [
         {

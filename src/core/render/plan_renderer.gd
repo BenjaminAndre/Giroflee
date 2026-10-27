@@ -41,7 +41,12 @@ static func build(doc: Document, sheet_id: String, options: Dictionary = {}) -> 
 		show_frame = options["frame"]
 	if show_frame:
 		FrameBuilder.build(sheet, ctx, list)
+		CartoucheBuilder.build(doc, sheet, ctx, list)
 
+	if sheet.kind == "unifilaire":
+		UnifilaireRenderer.add(doc, sheet, ctx, options, list)
+		_add_title(sheet, ctx, list)
+		return list
 	var overrides: Dictionary = {}
 	if options.has("overrides"):
 		overrides = options["overrides"]

@@ -30,6 +30,10 @@ static func set_value(doc: Document, payload: Dictionary) -> BuildResult:
 			return BuildResult.fail("config.%s: %s" % [key, problem])
 	elif value == null or not JsonUtil.is_json_value(value):
 		return BuildResult.fail("value must be a JSON value (not null)")
+	else:
+		var shape: String = BoardSchema.check(Catalog.for_pack(doc.pack_ref), section_name, key, value)
+		if not shape.is_empty():
+			return BuildResult.fail(shape)
 	var section: Dictionary = doc.section(section_name)
 	var before: Variant = null
 	if section.has(key):

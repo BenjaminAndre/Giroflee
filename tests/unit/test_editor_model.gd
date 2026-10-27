@@ -10,15 +10,15 @@ func before_each() -> void:
 
 func _names() -> Array[String]:
 	var out: Array[String] = []
-	for id: String in kit.doc().sheet_order:
+	for id: String in kit.doc().plan_ids():
 		out.append(kit.doc().get_sheet(id).display_name())
 	return out
 
 
 func test_a_new_project_starts_with_one_empty_etage() -> void:
-	assert_eq(kit.doc().sheet_order.size(), 1)
+	assert_eq(kit.doc().plan_ids().size(), 1)
 	assert_eq(_names(), ["Rez"])
-	assert_eq(kit.model.active_sheet_id, kit.doc().sheet_order[0])
+	assert_eq(kit.model.active_sheet_id, kit.doc().plan_ids()[0])
 	assert_false(kit.session.can_undo(), "creating the first étage is not an undo step")
 
 
@@ -31,15 +31,15 @@ func test_new_sheet_inherits_settings_gets_a_free_name_and_becomes_active() -> v
 	assert_eq(kit.sheet().display_name(), "Étage")
 	kit.model.new_sheet()
 	assert_eq(kit.sheet().display_name(), "Étage 2", "names stay unique")
-	assert_eq(kit.doc().sheet_order.find(kit.model.active_sheet_id), 2)
+	assert_eq(kit.doc().plan_ids().find(kit.model.active_sheet_id), 2)
 
 
 func test_new_sheet_goes_right_after_the_active_one() -> void:
 	kit.model.new_sheet()
 	kit.model.new_sheet()
-	kit.model.set_active_sheet(kit.doc().sheet_order[0])
+	kit.model.set_active_sheet(kit.doc().plan_ids()[0])
 	kit.model.new_sheet()
-	assert_eq(kit.doc().sheet_order.find(kit.model.active_sheet_id), 1)
+	assert_eq(kit.doc().plan_ids().find(kit.model.active_sheet_id), 1)
 
 
 func test_ctrl_t_creates_an_etage_and_ctrl_tab_cycles() -> void:
@@ -47,11 +47,13 @@ func test_ctrl_t_creates_an_etage_and_ctrl_tab_cycles() -> void:
 	assert_eq(_names(), ["Rez", "Étage"])
 	var second: String = kit.model.active_sheet_id
 	kit.key(KEY_TAB, false, true)
-	assert_eq(kit.model.active_sheet_id, kit.doc().sheet_order[0])
+	assert_eq(kit.model.sheet().kind, "unifilaire", "the unifilaire is part of the cycle")
 	kit.key(KEY_TAB, false, true)
-	assert_eq(kit.model.active_sheet_id, second)
+	assert_eq(kit.model.active_sheet_id, kit.doc().plan_ids()[0])
 	kit.key(KEY_TAB, true, true)
-	assert_eq(kit.model.active_sheet_id, kit.doc().sheet_order[0], "Ctrl+Shift+Tab goes back")
+	assert_eq(kit.model.sheet().kind, "unifilaire", "Ctrl+Shift+Tab goes back")
+	kit.key(KEY_TAB, true, true)
+	assert_eq(kit.model.active_sheet_id, second, "and wraps to the last étage")
 
 
 func test_duplicate_copies_the_architecture_but_not_the_symbols() -> void:
@@ -89,29 +91,29 @@ func test_duplicate_is_one_undo_step_and_keeps_sheet_settings() -> void:
 	assert_eq(kit.sheet().props["scale_den"], 100)
 	assert_eq(kit.session.history.undo_depth(), 1)
 	kit.key(KEY_Z, false, true)
-	assert_eq(kit.doc().sheet_order.size(), 1)
-	assert_eq(kit.model.active_sheet_id, kit.doc().sheet_order[0], "active étage falls back after the undo")
+	assert_eq(kit.doc().plan_ids().size(), 1)
+	assert_eq(kit.model.active_sheet_id, kit.doc().plan_ids()[0], "active étage falls back after the undo")
 	assert_eq(kit.doc().check_integrity(), "")
 
 
 func test_duplicating_an_empty_etage_works() -> void:
 	kit.model.duplicate_sheet(false)
-	assert_eq(kit.doc().sheet_order.size(), 2)
+	assert_eq(kit.doc().plan_ids().size(), 2)
 
 
 func test_delete_sheet_picks_a_neighbour_and_refuses_the_last_one() -> void:
 	kit.model.new_sheet()
 	kit.model.new_sheet()
-	kit.model.set_active_sheet(kit.doc().sheet_order[1])
+	kit.model.set_active_sheet(kit.doc().plan_ids()[1])
 	var doomed: String = kit.model.active_sheet_id
 	kit.model.delete_sheet()
 	assert_false(kit.doc().sheets.has(doomed))
-	assert_eq(kit.doc().sheet_order.size(), 2)
+	assert_eq(kit.doc().plan_ids().size(), 2)
 	assert_true(kit.doc().sheets.has(kit.model.active_sheet_id))
 	kit.model.delete_sheet()
 	watch_signals(kit.model)
 	kit.model.delete_sheet()
-	assert_eq(kit.doc().sheet_order.size(), 1, "the last étage cannot be deleted")
+	assert_eq(kit.doc().plan_ids().size(), 1, "the last étage cannot be deleted")
 	assert_signal_emitted(kit.model, "notice")
 
 
@@ -142,7 +144,7 @@ func test_selection_does_not_follow_to_another_etage() -> void:
 
 func test_ghost_toggle_defaults_to_the_etage_below() -> void:
 	kit.model.new_sheet()
-	var below: String = kit.doc().sheet_order[0]
+	var below: String = kit.doc().plan_ids()[0]
 	assert_false(kit.doc().config["ghost_on"], "off by default (FR-PLAN-7)")
 	kit.model.toggle_ghost()
 	assert_true(kit.doc().config["ghost_on"])

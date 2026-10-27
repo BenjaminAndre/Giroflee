@@ -2,7 +2,9 @@ class_name Document
 extends RefCounted
 ## The project: the single source of truth. Mutated only through PatchApplier (ARCH-2).
 
-const CURRENT_FORMAT_VERSION: int = 2
+const CURRENT_FORMAT_VERSION: int = 3
+## Id of the unifilaire sheet that format 3 adds to older files.
+const UNIFILAIRE_ID: String = "unifilaire"
 const VALUE_SECTIONS: PackedStringArray = ["config", "cartouche", "board", "circuits"]
 
 var pack_ref: String = "belgium"
@@ -25,6 +27,30 @@ static func new_project() -> Document:
 	var doc: Document = Document.new()
 	doc.config = Schema.default_config()
 	return doc
+
+
+## Props of a new unifilaire sheet: an A3 page measured in millimetres (scale 1, SRD FR-TAB-1).
+static func unifilaire_props() -> Dictionary:
+	return {"name": "Unifilaire", "paper_w_mm": 420, "paper_h_mm": 297, "scale_den": 1, "grid_step_mm": 10, "ghost_sheets": []}
+
+
+## Ids of the étages (plan sheets) in tab order.
+func plan_ids() -> Array[String]:
+	var out: Array[String] = []
+	for sheet_id: String in sheet_order:
+		var sheet: Sheet = sheets[sheet_id]
+		if sheet.kind == "plan":
+			out.append(sheet_id)
+	return out
+
+
+## The unifilaire sheet, or null when the document has none (scripts and tests may omit it).
+func unifilaire_sheet() -> Sheet:
+	for sheet_id: String in sheet_order:
+		var sheet: Sheet = sheets[sheet_id]
+		if sheet.kind == "unifilaire":
+			return sheet
+	return null
 
 
 func get_sheet(sheet_id: String) -> Sheet:
@@ -129,6 +155,10 @@ func check_integrity() -> String:
 		if not sheets.has(sheet_id):
 			return "sheet_order lists unknown sheet %s" % sheet_id
 	var seen: Dictionary = {}
+	for index: int in sheet_order.size():
+		var listed: Sheet = sheets[sheet_order[index]]
+		if listed.kind == "unifilaire" and index != 0:
+			return "the unifilaire sheet must be the first sheet"
 	for sheet_id: String in sheet_order:
 		var sheet: Sheet = sheets[sheet_id]
 		if sheet.kind != "plan" and not sheet.entities.is_empty():

@@ -99,7 +99,7 @@ func refresh() -> void:
 
 
 func _compute_signature() -> String:
-	return "%s|%s|%d" % [model.active_sheet_id, ",".join(PackedStringArray(model.selection)), model.revision]
+	return "%s|%s|%d|%d" % [model.active_sheet_id, ",".join(PackedStringArray(model.selection)), model.revision, model.view_revision]
 
 
 ## Runs `change` (a model call) without rebuilding the editors around the user, then records
@@ -115,10 +115,19 @@ func _rebuild() -> void:
 	for child: Node in _box.get_children():
 		child.queue_free()
 		_box.remove_child(child)
+	if model.sheet().kind == "unifilaire":
+		_build_sheet_name()
+		var board: BoardEditor = BoardEditor.new(model, _commit)
+		_box.add_child(board)
+		board.build_unifilaire()
+		return
 	var entities: Array[Entity] = model.selected_entities()
 	if entities.is_empty():
 		_build_sheet_section()
 		_build_project_section()
+		var cartouche: BoardEditor = BoardEditor.new(model, _commit)
+		_box.add_child(cartouche)
+		cartouche.build_cartouche()
 		return
 	var first: Entity = entities[0]
 	for entity: Entity in entities:
@@ -129,6 +138,12 @@ func _rebuild() -> void:
 
 
 # --- sections -----------------------------------------------------------------------------
+
+
+## The unifilaire's own settings are just its name (its page is fixed).
+func _build_sheet_name() -> void:
+	var sheet: Sheet = model.sheet()
+	_add_row("name", "string", sheet.props["name"], _on_sheet_prop.bind("name"))
 
 
 func _build_sheet_section() -> void:

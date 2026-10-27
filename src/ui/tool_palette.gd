@@ -70,9 +70,12 @@ func button_for(tool_id: String) -> Button:
 func sync() -> void:
 	if model == null:
 		return
+	var drawing: bool = model.sheet().kind == "plan"
 	for tool_id: Variant in _buttons.keys():
 		var button: Button = _buttons[tool_id]
 		button.set_pressed_no_signal(str(tool_id) == model.tool_name)
+		# the unifilaire has no drawing tools (SRD FR-TAB-5)
+		button.disabled = not drawing and str(tool_id) != "select"
 
 
 func _on_pressed(tool_id: String) -> void:

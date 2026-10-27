@@ -1,0 +1,16 @@
+{
+  "format_version": 1,
+  "items": [
+    {"id": "breaker_c16_3ka", "kind": "breaker", "title": "Disjoncteur C16 A / 3 kA", "label": "C16 A", "detail": "3 kA"},
+    {"id": "breaker_c40_3ka", "kind": "breaker", "title": "Disjoncteur général C40 A / 3 kA", "label": "C40 A", "detail": "3 kA"},
+    {"id": "diff_40a_300ma_a_ar", "kind": "differential", "title": "Différentiel 40 A / 300 mA type A, réenclenchement automatique", "label": "40 A", "detail": "300 mA A"},
+    {"id": "diff_40a_30ma_a", "kind": "differential", "title": "Différentiel 40 A / 30 mA type A", "label": "40 A", "detail": "30 mA A"},
+    {"id": "cable_xgb_3g2_5_cca", "kind": "cable", "title": "XGB 3G2,5 Cca", "label": "XGB 3G2,5 Cca"},
+    {"id": "cable_xgb_4x10", "kind": "cable", "title": "XGB 4x10 (compteur vers différentiel de tête)", "label": "XGB 4x10"},
+    {"id": "cable_vob_3x6", "kind": "cable", "title": "VOB 3x6 (tête vers barre)", "label": "VOB 3x6"},
+    {"id": "meter_kwh_27a", "kind": "meter", "title": "Compteur kWh 27 A", "label": "kWh", "detail": "27 A"}
+  ],
+  "circuit_defaults": {"breaker": "breaker_c16_3ka", "cable": "cable_xgb_3g2_5_cca"},
+  "usual_head": ["meter_kwh_27a", "cable_xgb_4x10", "diff_40a_300ma_a_ar", "cable_vob_3x6", "breaker_c40_3ka"],
+  "ruler_min_rows": 8
+}

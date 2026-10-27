@@ -62,7 +62,7 @@ func test_every_golden_file_loads_and_is_sound() -> void:
 func test_basic_floor_content() -> void:
 	var loaded: DocumentIO.LoadResult = DocumentIO.load_file("%s/basic_floor.giroflee" % GOLDEN_DIR)
 	var doc: Document = loaded.document
-	assert_eq(doc.sheet_order, ["sheet-rez", "sheet-etage", "sheet-cave"], "sheet.move put the cave last")
+	assert_eq(doc.sheet_order, ["unifilaire", "sheet-rez", "sheet-etage", "sheet-cave"], "the unifilaire is first and sheet.move put the cave last")
 	assert_false(doc.has_entity("rez-window-1"), "removed in the script")
 	assert_eq(TestKit.entity_props(doc, "rez-lamp-1")["pos"], [2250, 2400], "moved by [250, -100]")
 	assert_eq(TestKit.entity_props(doc, "rez-room-1")["text"], "Salle de séjour")

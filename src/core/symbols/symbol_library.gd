@@ -7,6 +7,7 @@ extends RefCounted
 
 const PACKS_DIR: String = "res://packs"
 const ATTACH_KINDS: PackedStringArray = ["free", "wall"]
+const ROLES: PackedStringArray = ["control", "consumer"]
 
 static var _cache: Dictionary = {}
 
@@ -29,6 +30,8 @@ class Def:
 	var caption: String = ""
 	## A marker (board, meter): drawn in the marker colour, not part of a circuit.
 	var marker: bool = false
+	## "control" (a switch: it commands a consumer) or "consumer" (a lamp, a socket).
+	var role: String = "consumer"
 
 
 var pack_id: String = ""
@@ -114,8 +117,13 @@ func _build_def(dir: String, type: String, entry: Dictionary) -> Def:
 	if not ATTACH_KINDS.has(attach):
 		problems.append("%s: unknown attach '%s' (free or wall)" % [label, attach])
 		return null
+	var role: String = str(entry.get("role", "consumer"))
+	if not ROLES.has(role):
+		problems.append("%s: unknown role '%s' (control or consumer)" % [label, role])
+		return null
 	var built: Def = Def.new()
 	built.id = type
+	built.role = role
 	built.title = str(entry["title"])
 	built.attach = attach
 	built.counts_as_point = JsonUtil.bool_or(entry, "counts_as_point", true)

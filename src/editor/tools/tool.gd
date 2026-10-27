@@ -41,6 +41,11 @@ func overrides(_model: EditorModel) -> Dictionary:
 	return {}
 
 
+## Extra options for the renderer while the tool is in use (the unifilaire's selection and drop mark).
+func render_options(_model: EditorModel) -> Dictionary:
+	return {}
+
+
 ## Extra ops drawn on top of the sheet (placement ghost, rubber band, readouts).
 func preview(_model: EditorModel) -> DrawList:
 	return DrawList.new()

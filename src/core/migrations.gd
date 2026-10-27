@@ -11,7 +11,7 @@ extends RefCounted
 ## Migrations shipped with the app. (New config keys with defaults, such as symbol_scale, need no
 ## migration: loading fills missing config keys with their defaults.)
 static func default_registry() -> Dictionary:
-	return {1: _v1_to_v2}
+	return {1: _v1_to_v2, 2: _v2_to_v3}
 
 
 ## Format 2 moves the border frame, the étage-title position, the ghost-view switch and the A4/A3
@@ -37,6 +37,20 @@ static func _v1_to_v2(data: Dictionary) -> Dictionary:
 		for key: String in Schema.MOVED_TO_CONFIG:
 			props.erase(key)
 	out["config"] = config
+	return out
+
+
+## Format 3 adds the unifilaire sheet, first in the tab order, to a project that has none
+## (SRD FR-TAB-1). Nothing else changes.
+static func _v2_to_v3(data: Dictionary) -> Dictionary:
+	var out: Dictionary = data.duplicate(true)
+	var sheets: Array = out.get("sheets", [])
+	for item: Variant in sheets:
+		var sheet: Dictionary = item
+		if sheet.get("kind", "") == "unifilaire":
+			return out
+	sheets.insert(0, {"id": Document.UNIFILAIRE_ID, "kind": "unifilaire", "props": Document.unifilaire_props(), "entities": []})
+	out["sheets"] = sheets
 	return out
 
 

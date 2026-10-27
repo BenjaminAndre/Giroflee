@@ -105,14 +105,17 @@ func test_ctrl_t_adds_a_tab_and_ctrl_tab_switches() -> void:
 	assert_eq(h.window.tabs.current_tab, 1)
 	h.key("Tab", ["ctrl"])
 	await h.play(self)
+	assert_eq(h.window.tabs.current_tab, -1, "the unifilaire button is lit instead")
+	h.key("Tab", ["ctrl"])
+	await h.play(self)
 	assert_eq(h.window.tabs.current_tab, 0)
-	assert_eq(h.model().active_sheet_id, h.model().doc().sheet_order[0])
+	assert_eq(h.model().active_sheet_id, h.model().doc().plan_ids()[0])
 
 
 func test_clicking_a_tab_switches_the_etage() -> void:
 	h.model().new_sheet()
 	h.window.tabs.current_tab = 0
-	assert_eq(h.model().active_sheet_id, h.model().doc().sheet_order[0])
+	assert_eq(h.model().active_sheet_id, h.model().doc().plan_ids()[0])
 
 
 func test_the_plus_button_creates_an_etage() -> void:
@@ -129,7 +132,7 @@ func test_palette_opens_filters_and_runs_a_command() -> void:
 	h.window.palette._field.text_changed.emit("dupl etage")
 	h.key("Enter")
 	await h.play(self)
-	assert_eq(h.model().doc().sheet_order.size(), 2, "'Dupliquer l'étage' ran")
+	assert_eq(h.model().doc().plan_ids().size(), 2, "'Dupliquer l'étage' ran")
 	assert_false(h.window.palette.visible)
 	assert_eq(h.model().sheet().entities.size(), 1, "the wall was copied")
 
@@ -140,7 +143,7 @@ func test_palette_escape_closes_it_without_running_anything() -> void:
 	h.key("Escape")
 	await h.play(self)
 	assert_false(h.window.palette.visible)
-	assert_eq(h.model().doc().sheet_order.size(), 1)
+	assert_eq(h.model().doc().plan_ids().size(), 1)
 
 
 func test_tool_keys_do_not_leak_into_the_palette_search() -> void:

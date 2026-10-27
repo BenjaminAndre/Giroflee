@@ -75,6 +75,18 @@ static func build() -> Theme:
 	theme.set_color("up_hover_icon_modulate", "SpinBox", BLUE)
 	theme.set_color("down_hover_icon_modulate", "SpinBox", BLUE)
 
+	# the unifilaire button next to the étage tabs: the one accent-coloured, always-first tab (FR-TAB-2)
+	theme.set_type_variation("UnifilaireButton", "Button")
+	theme.set_stylebox("normal", "UnifilaireButton", _tab_button(Color(BLUE.r, BLUE.g, BLUE.b, 0.16), BLUE))
+	theme.set_stylebox("hover", "UnifilaireButton", _tab_button(Color(BLUE.r, BLUE.g, BLUE.b, 0.28), BLUE))
+	theme.set_stylebox("pressed", "UnifilaireButton", _tab_button(BLUE, BLUE))
+	theme.set_stylebox("hover_pressed", "UnifilaireButton", _tab_button(BLUE, BLUE))
+	theme.set_color("font_color", "UnifilaireButton", BLUE)
+	theme.set_color("font_hover_color", "UnifilaireButton", BLUE)
+	theme.set_color("font_pressed_color", "UnifilaireButton", BASE)
+	theme.set_color("font_hover_pressed_color", "UnifilaireButton", BASE)
+	theme.set_color("font_focus_color", "UnifilaireButton", BLUE)
+
 	# tabs (the étages)
 	theme.set_stylebox("tab_selected", "TabBar", _tab(BASE, true))
 	theme.set_stylebox("tab_unselected", "TabBar", _tab(MANTLE, false))
@@ -134,6 +146,19 @@ static func _line(color: Color) -> StyleBoxLine:
 	line.color = color
 	line.thickness = 1
 	return line
+
+
+static func _tab_button(bg: Color, border: Color) -> StyleBoxFlat:
+	var box: StyleBoxFlat = StyleBoxFlat.new()
+	box.bg_color = bg
+	box.border_color = border
+	box.set_border_width_all(0)
+	box.border_width_bottom = 3
+	box.content_margin_left = 14.0
+	box.content_margin_right = 14.0
+	box.content_margin_top = 6.0
+	box.content_margin_bottom = 6.0
+	return box
 
 
 static func _tab(bg: Color, selected: bool) -> StyleBoxFlat:

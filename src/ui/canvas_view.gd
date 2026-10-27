@@ -132,10 +132,10 @@ func _draw_hint(view: ViewTransform, sheet: Sheet, w_mm: float, h_mm: float, lab
 
 func _sheet_list() -> DrawList:
 	var overrides: Dictionary = model.tool.overrides(model)
-	if overrides.is_empty() and _cached_list != null and _cached_revision == model.revision and _cached_view_revision == model.view_revision and _cached_sheet == model.active_sheet_id:
+	if overrides.is_empty() and not model.tool.is_active() and _cached_list != null and _cached_revision == model.revision and _cached_view_revision == model.view_revision and _cached_sheet == model.active_sheet_id:
 		return _cached_list
 	var list: DrawList = model.page_list()
-	if overrides.is_empty():
+	if overrides.is_empty() and not model.tool.is_active():
 		_cached_list = list
 		_cached_revision = model.revision
 		_cached_view_revision = model.view_revision
