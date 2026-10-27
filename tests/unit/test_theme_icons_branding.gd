@@ -15,7 +15,7 @@ func _relative_luminance(c: Color) -> float:
 	return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
 
 
-func _close(a: Color, b: Color, tol: float = 0.12) -> bool:test_the_windows_export_embeds_the_icon
+func _close(a: Color, b: Color, tol: float = 0.12) -> bool:
 	return absf(a.r - b.r) < tol and absf(a.g - b.g) < tol and absf(a.b - b.b) < tol
 
 
