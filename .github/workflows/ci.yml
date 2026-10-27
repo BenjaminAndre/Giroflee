@@ -83,27 +83,6 @@ jobs:
           sed -i "s|^config/version=.*|config/version=\"${{ steps.version.outputs.version }}\"|" project.godot
           grep -q "config/version=\"${{ steps.version.outputs.version }}\"" project.godot
 
-      # The logo is embedded in the .exe by Godot through rcedit (a Windows tool), which runs here
-      # under Wine. Godot reads the two tool paths from its editor settings.
-      - name: Install rcedit and Wine
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends wine xvfb
-          mkdir -p "$HOME/rcedit"
-          curl -fsSL https://github.com/electron/rcedit/releases/download/v2.0.0/rcedit-x64.exe -o "$HOME/rcedit/rcedit-x64.exe"
-          export WINEDEBUG=-all WINEDLLOVERRIDES="mscoree,mshtml="
-          xvfb-run -a wineboot --init || true
-          mkdir -p "$HOME/.config/godot"
-          for name in editor_settings-4.tres editor_settings-4.7.tres; do
-            printf '[gd_resource type="EditorSettings" format=3]
-
-[resource]
-export/windows/rcedit = "%s"
-export/windows/wine = "%s"
-'               "$HOME/rcedit/rcedit-x64.exe" "$(command -v wine)" > "$HOME/.config/godot/$name"
-          done
-
       - name: Import project
         run: $GODOT --headless --import
 
@@ -111,14 +90,8 @@ export/windows/wine = "%s"
         run: |
           set -euo pipefail
           mkdir -p build/windows
-          export WINEDEBUG=-all
-          $GODOT --headless --export-release "Windows Desktop" build/windows/Giroflee.exe 2>&1 | tee /tmp/export.log
+          $GODOT --headless --export-release "Windows Desktop" build/windows/Giroflee.exe
           test -f build/windows/Giroflee.exe
-          # a failed icon step is only a warning in Godot: do not let it pass unnoticed
-          if grep -qiE "rcedit.*(error|fail|not found)|(could not|failed).*(rcedit|resources)" /tmp/export.log; then
-            echo "embedding the icon with rcedit failed (see above)" >&2
-            exit 1
-          fi
 
       # Two assets: the versioned zip, and a version-less copy so that
       # https://github.com/<owner>/<repo>/releases/latest/download/Giroflee-windows.zip
@@ -149,3 +122,4 @@ export/windows/wine = "%s"
             gh release create "$tag" "$versioned" build/Giroflee-windows.zip \
               --target "${GITHUB_SHA}" --title "Giroflée ${tag}" --generate-notes --latest
           fi
+
