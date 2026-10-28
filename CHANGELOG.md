@@ -28,6 +28,9 @@ Versions are `vMAJOR.MINOR.PATCH`: `MAJOR.MINOR` come from the `VERSION` file, `
 - **M4 unifilaire** (SRD section 19.7): the unifilaire is a sheet that always exists and is always first, shown as an accent-coloured button left of the étage tabs; étage tabs can be reordered by dragging (and from the palette), new étages go right after the active one; **format 3** adds the unifilaire sheet to older files. The unifilaire is derived from the plans (circuits as columns, points as rows on a shared ruler, switches chained to their lamps, `xN` collapsing, `?` for a switch without lamp, titles proposed from room labels), laid out on the page with the head chain, the bus and its devices, and drawn with the pack artwork. Board editor in the Properties panel (circuit titles, breaker and cable from the pack catalogue, spare circuits, bus devices, head chain, the usual head on request), column and device reordering by dragging, click on a point to see its symbol on the plan. The cartouche is drawn on every sheet from the pack template with project fields edited in the panel. CLI `derive-unifilaire`.
 - Tests: 681 in total.
 
+### Fixed
+- Exported builds showed empty tool buttons and no electric symbols: the SVG icons and pack artwork are read as text at run time but were imported as textures, so the files were missing from the package. They are now kept as plain files (`importer="keep"`), with a test.
+
 ### Changed
 - The Windows executable now carries the logo (export preset icon and product details; the release job installs Wine and rcedit).
 - `sheet.add`, `sheet.move` and `sheet.remove` keep the unifilaire first and unique; `doc.set` validates `board`, `circuits` and `cartouche`; the status bar zoom is relative to the sheet scale; the golden scenario includes the unifilaire.

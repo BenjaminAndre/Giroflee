@@ -248,3 +248,14 @@ func test_checkboxes_are_plain_rows_not_framed_buttons() -> void:
 	var theme: Theme = AppTheme.build()
 	for style_name: String in ["normal", "pressed", "hover"]:
 		assert_true(theme.get_stylebox(style_name, "CheckBox") is StyleBoxEmpty, "CheckBox/%s" % style_name)
+
+
+func test_runtime_svg_files_are_exported_as_is() -> void:
+	# icons and pack artwork are read as text at run time; an imported SVG is not available that way
+	# in an exported build (the icons and every symbol went missing in the first M3 release)
+	var dirs: Array[String] = ["res://assets/icons", "res://packs/belgium/symbols"]
+	for dir: String in dirs:
+		for file: String in DirAccess.get_files_at(dir):
+			if file.ends_with(".svg"):
+				var meta: String = FileAccess.get_file_as_string("%s/%s.import" % [dir, file])
+				assert_string_contains(meta, "importer=\"keep\"", "%s/%s must be kept as a plain file" % [dir, file])
