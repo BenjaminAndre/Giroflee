@@ -32,6 +32,8 @@ class Def:
 	var marker: bool = false
 	## "control" (a switch: it commands a consumer) or "consumer" (a lamp, a socket).
 	var role: String = "consumer"
+	## A consumer that is normally commanded by a switch (a lamp, not a socket).
+	var needs_control: bool = false
 
 
 var pack_id: String = ""
@@ -124,6 +126,7 @@ func _build_def(dir: String, type: String, entry: Dictionary) -> Def:
 	var built: Def = Def.new()
 	built.id = type
 	built.role = role
+	built.needs_control = JsonUtil.bool_or(entry, "needs_control", false)
 	built.title = str(entry["title"])
 	built.attach = attach
 	built.counts_as_point = JsonUtil.bool_or(entry, "counts_as_point", true)

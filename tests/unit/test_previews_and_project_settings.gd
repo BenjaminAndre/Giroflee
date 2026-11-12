@@ -204,7 +204,7 @@ func test_v1_files_migrate_through_every_format() -> void:
 func test_a_migrated_file_saves_in_the_current_format_and_reloads_identically() -> void:
 	var doc: Document = DocumentIO.load_file("res://tests/fixtures/project_v1.giroflee").document
 	var text: String = DocumentIO.to_json(doc)
-	assert_string_contains(text, "\"format_version\": 3")
+	assert_string_contains(text, "\"format_version\": 4")
 	var again: DocumentIO.LoadResult = DocumentIO.from_json(text)
 	assert_eq(again.error, "")
 	assert_eq(DocumentIO.to_json(again.document), text)
@@ -221,5 +221,5 @@ func test_a_v1_file_without_sheets_migrates_with_defaults() -> void:
 
 
 func test_a_file_from_the_future_is_still_refused() -> void:
-	var raw: Dictionary = {"format_version": 4}
+	var raw: Dictionary = {"format_version": 5}
 	assert_string_contains(DocumentIO.from_dict(raw).error, "newer version")

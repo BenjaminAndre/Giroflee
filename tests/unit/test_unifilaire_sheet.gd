@@ -113,9 +113,9 @@ func test_a_file_with_the_unifilaire_not_first_is_refused() -> void:
 	assert_string_contains(loaded.error, "unifilaire")
 
 
-func test_the_current_format_is_3() -> void:
-	assert_eq(Document.CURRENT_FORMAT_VERSION, 3)
-	assert_eq(doc.to_dict()["format_version"], 3)
+func test_the_current_format_is_4() -> void:
+	assert_eq(Document.CURRENT_FORMAT_VERSION, 4)
+	assert_eq(doc.to_dict()["format_version"], 4)
 
 
 func test_format_2_files_get_the_unifilaire_first() -> void:

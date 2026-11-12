@@ -2,16 +2,18 @@ class_name Document
 extends RefCounted
 ## The project: the single source of truth. Mutated only through PatchApplier (ARCH-2).
 
-const CURRENT_FORMAT_VERSION: int = 3
+const CURRENT_FORMAT_VERSION: int = 4
 ## Id of the unifilaire sheet that format 3 adds to older files.
 const UNIFILAIRE_ID: String = "unifilaire"
-const VALUE_SECTIONS: PackedStringArray = ["config", "cartouche", "board", "circuits"]
+const VALUE_SECTIONS: PackedStringArray = ["config", "cartouche", "board", "circuits", "acknowledgements"]
 
 var pack_ref: String = "belgium"
 var config: Dictionary = {}
 var cartouche: Dictionary = {}
 var board: Dictionary = {}
 var circuits: Dictionary = {}
+## Report issues the author has acknowledged: issue key -> true (SRD FR-RPT-8).
+var acknowledgements: Dictionary = {}
 var sheet_order: Array[String] = []
 ## Bumped by every applied patch; derived caches (SpatialIndex) are keyed on it. Not saved.
 var revision: int = 0
@@ -91,6 +93,8 @@ func section(name: String) -> Dictionary:
 			return board
 		"circuits":
 			return circuits
+		"acknowledgements":
+			return acknowledgements
 	return {}
 
 
@@ -143,6 +147,7 @@ func to_dict() -> Dictionary:
 		"cartouche": cartouche.duplicate(true),
 		"board": board.duplicate(true),
 		"circuits": circuits.duplicate(true),
+		"acknowledgements": acknowledgements.duplicate(true),
 		"sheets": sheet_list,
 	}
 

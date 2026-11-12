@@ -11,6 +11,10 @@ extends RefCounted
 ##   Prints the unifilaire derived from the plans and the board of a project as JSON (columns, points,
 ##   bus, head chain, rows, warnings; SRD section 8). Nothing is written.
 ##
+## validate <project.giroflee> [--strict]
+##   Prints the report of a project as JSON (SRD section 9): counts and the issues. Exit code 0, or 1
+##   with --strict when errors are still open (acknowledged ones do not count).
+##
 ## run-script <script.json> [--project <file>] [--out <file>] [--print]
 ##   Applies the commands of a script to a project (a new empty one unless --project is
 ##   given), through the same resolver as the GUI. Script format:
@@ -29,7 +33,6 @@ const EXIT_USAGE: int = 2
 ## Subcommands announced by the SRD and not implemented yet (milestone in brackets).
 const PLANNED: Dictionary = {
 	"export-svg": "M6",
-	"validate": "M5",
 }
 
 var output: PackedStringArray = PackedStringArray()
@@ -52,6 +55,8 @@ func run(args: PackedStringArray) -> int:
 			return _run_script(args.slice(1))
 		"derive-unifilaire":
 			return _derive_unifilaire(args.slice(1))
+		"validate":
+			return _validate(args.slice(1))
 		_:
 			if PLANNED.has(args[0]):
 				output.append("%s: not implemented yet (planned for %s)" % [args[0], PLANNED[args[0]]])
@@ -63,11 +68,46 @@ func run(args: PackedStringArray) -> int:
 
 func _usage() -> void:
 	output.append("usage: %s <subcommand> [args]" % COMMAND_NAME)
-	var names: PackedStringArray = PackedStringArray(["help", "version", "run-script", "derive-unifilaire"])
+	var names: PackedStringArray = PackedStringArray(["help", "version", "run-script", "derive-unifilaire", "validate"])
 	names.append_array(PackedStringArray(PLANNED.keys()))
 	output.append("subcommands: %s" % ", ".join(names))
 	output.append("run-script <script.json> [--project <file>] [--out <file>] [--print]")
 	output.append("derive-unifilaire <project.giroflee>")
+	output.append("validate <project.giroflee> [--strict]")
+
+
+func _validate(args: PackedStringArray) -> int:
+	var path: String = ""
+	var strict: bool = false
+	for arg: String in args:
+		if arg == "--strict":
+			strict = true
+		elif arg.begins_with("--") or not path.is_empty():
+			output.append("unexpected argument: %s" % arg)
+			return EXIT_USAGE
+		else:
+			path = arg
+	if path.is_empty():
+		output.append("validate needs one project file")
+		return EXIT_USAGE
+	var loaded: DocumentIO.LoadResult = DocumentIO.load_file(path)
+	if loaded.document == null:
+		output.append("%s: %s" % [path, loaded.error])
+		return EXIT_FAILURE
+	var errors: int = 0
+	var warnings: int = 0
+	var acknowledged: int = 0
+	var list: Array = []
+	for issue: Issue in ReportBuilder.build(loaded.document):
+		list.append(issue.to_dict())
+		if issue.acknowledged:
+			acknowledged += 1
+		elif issue.is_error():
+			errors += 1
+		else:
+			warnings += 1
+	output.append(JsonWriter.stringify({"errors": errors, "warnings": warnings, "acknowledged": acknowledged, "issues": list}))
+	return EXIT_FAILURE if strict and errors > 0 else EXIT_OK
 
 
 func _derive_unifilaire(args: PackedStringArray) -> int:

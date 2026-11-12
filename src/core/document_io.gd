@@ -5,7 +5,7 @@ extends RefCounted
 ## keys and invalid values are errors, never silently dropped.
 
 const TOP_LEVEL_KEYS: PackedStringArray = [
-	"format_version", "pack_ref", "config", "cartouche", "board", "circuits", "sheets",
+	"format_version", "pack_ref", "config", "cartouche", "board", "circuits", "acknowledgements", "sheets",
 ]
 
 

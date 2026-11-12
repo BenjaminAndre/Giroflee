@@ -31,7 +31,7 @@ static func pick(sheet: Sheet, ctx: RenderContext, p: Vector2, tolerance: float,
 	return best_id
 
 
-## Entities whose bounds touch `rect` (box selection), in id order.
+## Entities whose bounds lie fully inside `rect` (box selection, SRD FR-EDIT-1), in id order.
 static func in_rect(sheet: Sheet, ctx: RenderContext, rect: Rect2, exclude: Array = [], index: SpatialIndex = null) -> Array[String]:
 	var out: Array[String] = []
 	var area: Rect2 = rect.abs()
@@ -40,6 +40,6 @@ static func in_rect(sheet: Sheet, ctx: RenderContext, rect: Rect2, exclude: Arra
 		if exclude.has(entity_id):
 			continue
 		var entity: Entity = sheet.entities[entity_id]
-		if area.intersects(EntityGeometry.bounds(entity, ctx), true):
+		if area.encloses(EntityGeometry.bounds(entity, ctx)):
 			out.append(entity_id)
 	return out

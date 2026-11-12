@@ -11,7 +11,7 @@ extends RefCounted
 ## Migrations shipped with the app. (New config keys with defaults, such as symbol_scale, need no
 ## migration: loading fills missing config keys with their defaults.)
 static func default_registry() -> Dictionary:
-	return {1: _v1_to_v2, 2: _v2_to_v3}
+	return {1: _v1_to_v2, 2: _v2_to_v3, 3: _v3_to_v4}
 
 
 ## Format 2 moves the border frame, the étage-title position, the ghost-view switch and the A4/A3
@@ -51,6 +51,14 @@ static func _v2_to_v3(data: Dictionary) -> Dictionary:
 			return out
 	sheets.insert(0, {"id": Document.UNIFILAIRE_ID, "kind": "unifilaire", "props": Document.unifilaire_props(), "entities": []})
 	out["sheets"] = sheets
+	return out
+
+
+## Format 4 adds the (empty) acknowledgements of the report (SRD FR-RPT-8).
+static func _v3_to_v4(data: Dictionary) -> Dictionary:
+	var out: Dictionary = data.duplicate(true)
+	if not out.has("acknowledgements"):
+		out["acknowledgements"] = {}
 	return out
 
 

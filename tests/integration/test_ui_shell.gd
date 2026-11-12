@@ -52,7 +52,9 @@ func test_menus_list_their_commands_with_approved_shortcuts_only() -> void:
 	for label: String in ["Nouveau projet", "Ouvrir", "Enregistrer", "Enregistrer sous"]:
 		assert_true(_item(file, label) >= 0, label)
 	assert_string_contains(file.get_item_text(_item(file, "Nouveau projet")), "Ctrl+N")
-	assert_false(file.get_item_text(_item(file, "Enregistrer")).contains("Ctrl+S"), "no key was approved for saving (WA-1)")
+	assert_string_contains(file.get_item_text(_item(file, "Enregistrer")), "Ctrl+S")
+	assert_string_contains(file.get_item_text(_item(file, "Enregistrer sous")), "Ctrl+Maj+S")
+	assert_string_contains(file.get_item_text(_item(file, "Ouvrir")), "Ctrl+O")
 	var edit: PopupMenu = h.window.menu("Édition")
 	assert_string_contains(edit.get_item_text(_item(edit, "Annuler")), "Ctrl+Z")
 	var sheet: PopupMenu = h.window.menu("Étage")

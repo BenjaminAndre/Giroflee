@@ -65,3 +65,27 @@ func test_derive_unifilaire_reports_bad_usage_and_unreadable_files() -> void:
 	var cli: Cli = Cli.new()
 	assert_eq(cli.run(PackedStringArray(["derive-unifilaire"])), Cli.EXIT_USAGE)
 	assert_eq(cli.run(PackedStringArray(["derive-unifilaire", "user://nowhere.giroflee"])), Cli.EXIT_FAILURE)
+
+
+func test_validate_prints_the_report_and_strict_fails_on_open_errors() -> void:
+	var s: Session = TestKit.session()
+	TestKit.add_sheet(s, "p1", "Rez")
+	TestKit.add_symbol(s, "p1", "a", [1000, 1000], "", 0)
+	var path: String = "user://cli_validate_test.giroflee"
+	assert_eq(DocumentIO.save_file(s.document(), path), "")
+	var cli: Cli = Cli.new()
+	assert_eq(cli.run(PackedStringArray(["validate", path])), Cli.EXIT_OK, "never blocks by default")
+	var json: JSON = JSON.new()
+	assert_eq(json.parse("\n".join(cli.output)), OK)
+	var data: Dictionary = json.data
+	var errors: int = data["errors"]
+	assert_gt(errors, 0)
+	assert_eq(cli.run(PackedStringArray(["validate", path, "--strict"])), Cli.EXIT_FAILURE)
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+
+
+func test_validate_reports_bad_usage() -> void:
+	var cli: Cli = Cli.new()
+	assert_eq(cli.run(PackedStringArray(["validate"])), Cli.EXIT_USAGE)
+	assert_eq(cli.run(PackedStringArray(["validate", "a.giroflee", "b.giroflee"])), Cli.EXIT_USAGE)
+	assert_eq(cli.run(PackedStringArray(["validate", "user://nowhere.giroflee"])), Cli.EXIT_FAILURE)

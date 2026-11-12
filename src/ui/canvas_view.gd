@@ -225,7 +225,7 @@ func _draw_selection(view: ViewTransform) -> void:
 	var entities: Array[Entity] = model.selected_entities()
 	if entities.size() > 1:
 		for entity: Entity in entities:
-			_draw_box(view, EntityGeometry.bounds(entity, context).grow(4.0 / view.zoom), false, 0.5)
+			_draw_box(view, EntityGeometry.bounds(model.live_entity(entity), context).grow(4.0 / view.zoom), false, 0.5)
 	if model.tool_name != "select":
 		return
 	var box: TransformBox = SelectTool.box_for(model)

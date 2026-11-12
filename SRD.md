@@ -1,6 +1,6 @@
 # Giroflée — Software Requirements Document
 
-Status: **draft 0.9** · Progress: see section 0.1 · Language of this document: English · Language of the product: French (v0.1)
+Status: **draft 1.0** · Progress: see section 0.1 · Language of this document: English · Language of the product: French (v0.1)
 Audience: the author, and Claude (as the implementing agent). Technical notes are mixed in on purpose and marked **[TECH]**. Requirements are numbered so code, tests and commits can cite them (`FR-…`, `ARCH-…`, `PACK-…`, `LIC-…`).
 
 Keywords: MUST / SHOULD / MAY as in RFC 2119. Everything here has been decided by the author unless it appears in the pending list of section 18.
@@ -27,7 +27,8 @@ Keywords: MUST / SHOULD / MAY as in RFC 2119. Everything here has been decided b
 | M2b Test feedback and look (section 19.5): previews that look final, project-wide settings, menu bar, tool bar, Affinity-style handles, antialiased rendering, Latte theme, logo and app icon | **Done** (406 tests; open interpretations in section 18) |
 | M3 Electric symbols: pack and library, circuits and numbering, symbol tools, Alt-place, pipette, quickbar, circuit focus, copy settings, select by filter, wall-facing sockets, label solver, anchoring | **Done** (section 19.6; 579 tests; open interpretations in section 18) |
 | M4 Unifilaire tab, étage tab order, unifilaire derivation and rendering, board editor, cartouche | **Done** (section 19.7; 681 tests; open interpretations in section 18) |
-| M5 – M7 | Not started |
+| M5 Report panel and rules: issues, acknowledgements, Tab / Enter, jump to the subject, `validate` CLI, rules loaded from the pack | **Done** (section 19.8; 735 tests; the rules that need RGIE values wait for `rules.json`, section 18) |
+| M6 – M7 | Not started |
 
 ---
 
@@ -161,6 +162,7 @@ The **étage name** is shown automatically as a large dark-red title on the shee
 
 ### 6.1b Previews look final (FR-PREV)
 - **FR-PREV-1** While a wall, block, opening or stair is being drawn, the preview is **drawn exactly as the finished object will be**: same colour, line weight, mitred joins and fill, not a tinted or translucent outline. A wall shows up as a wall from its first segment on (author feedback: the blue preview was confusing). Only a live length readout and the snap marker are extra, and both are visually neutral (not wall-coloured).
+- **FR-PREV-5** Everything that depends on the pointer or on a modifier key is redrawn **live**: previews and the transform box follow a gesture while it runs (the box is drawn around the entity as it will be, not as it was), and pressing or releasing `Shift`, `Ctrl` or `Alt` updates the preview at once (the Alt-place label, scaling from the centre, free-angle walls) without the pointer having to move.
 - **FR-PREV-2** The preview is computed by the same code as the final drawing (`EntityGeometry.add_ops`), so the two cannot differ.
 
 ### 6.1c Transform handles (FR-HANDLE)
@@ -190,26 +192,26 @@ Resizing and rotating work **like in Affinity**, with handles around the selecti
 ### 6.3 Stacks (FR-STACK)
 Real walls often hold a vertical stack at one spot: a socket near the floor, a switch at waist height, a lamp at head height. On a plan these are drawn side by side.
 - **FR-STACK-1** **Anchoring a symbol to another symbol makes a stack.** There is no separate stack object: a symbol may have one `anchor` (parent symbol + relative offset); a stack is a parent with its anchored descendants. Chains are allowed, cycles are rejected by the Resolver. Moving, rotating or flipping a parent carries all its descendants (rotation/flip act on the offsets too). Moving an anchored symbol on its own only changes its offset. Circuits, indices and labels stay per symbol.
-- **FR-STACK-2** Commands (command palette): **"Ancrer à un symbole"** (pick the parent) and **"Détacher"**. Detaching, or deleting the parent, leaves the children in place at their current absolute position and unanchored. Any dedicated key or mouse gesture is added only when the author asks (WA-1).
+- **FR-STACK-2** Commands (command palette): **"Ancrer à un symbole"** (pick the parent) and **"Détacher"**. Detaching, or deleting the parent, leaves the children in place at their current absolute position and unanchored. Any dedicated key or mouse gesture is added only when the author asks (WA-1). **Gestures (decided):** **Alt + drag** a symbol onto another symbol anchors it (the whole selection when the dragged symbol is selected; nothing moves, the offset is recorded); **Alt + right-click** a symbol detaches it.
 - **FR-STACK-3** Copy and cut of a symbol include its descendants; pasting recreates the anchoring. Copying an anchored child alone drops the anchor.
 - **FR-STACK-4** The label solver (FR-SYM-5) treats a stack as one unit and fans the labels out on a free side.
 - **FR-STACK-5** The tool does **not** create or enforce the physical order of a stack (not its responsibility). Each symbol may carry an optional `height`; a later rule MAY validate heights against the RGIE (not in v0.1).
 
 ### 6.4 Selection, editing, copy/paste (FR-EDIT)
-- **FR-EDIT-1** Click, Shift-click, box select; select-all; delete; move with snapping; arrow-key nudge.
+- **FR-EDIT-1** Click, **Ctrl-click** (add to or remove from the selection), box select (selects only what is **fully inside** the box; **Ctrl** held adds to the selection); select-all; delete; move with snapping; arrow-key nudge. Shift-click is not a selection gesture: it pastes settings (FR-EDIT-7, as in Factorio).
 - **FR-EDIT-2** Copy / cut / paste of any selection (walls, openings, stairs, blocks, labels, symbols, stacks), **between sheets, projects and app windows**. **[TECH]** system clipboard as JSON text with a `giroflee/1` header.
 - **FR-EDIT-3** Paste of electric symbols: each pasted point group gets **fresh indices** in its circuit while **keeping its internal links** (a pasted switch+lamp pair stays a pair). Paste position: at cursor.
 - **FR-EDIT-4** **Duplicate étage** (palette command, plus a key): copies the architectural content (walls, openings, stairs, blocks, labels) **without** electric symbols. A second command, "Dupliquer l'étage avec les symboles", copies everything (indices reassigned as in FR-EDIT-3). The author's workflow: map the ground floor → duplicate → adjust walls/doors → copy symbols from another étage.
 - **FR-EDIT-5** Unlimited undo/redo; a drag or a multi-object operation is one step (**[TECH]** command transactions).
 - **FR-EDIT-6** All text is editable in place: room labels, symbol labels, étage name, cartouche fields.
-- **FR-EDIT-7** **Copy / paste settings** (like Factorio's copy settings): copy the *style-like* properties of one entity and apply them to a selection of entities **of the same type** (others are ignored). Copied: text font, size and role; symbol flip, count and rotation; opening and stair parameters; wall weight; grey-block fill. Never copied: identity, position, circuit, index, anchor. Commands "Copier les propriétés" / "Coller les propriétés" in the palette; no key or gesture is assigned until the author picks one (WA-1).
+- **FR-EDIT-7** **Copy / paste settings** (like Factorio's copy settings): copy the *style-like* properties of one entity and apply them to a selection of entities **of the same type** (others are ignored). Copied: text font, size and role; symbol flip, count and rotation; opening and stair parameters; wall weight; grey-block fill. Never copied: identity, position, circuit, index, anchor. Commands "Copier les propriétés" / "Coller les propriétés" in the palette; no key or gesture is assigned until the author picks one (WA-1). **Gestures (decided, like Factorio):** **Shift + right-click** an entity copies its settings; **Shift + left-click** an entity pastes them onto it (entities of another type are left alone). The palette commands stay and act on the selection.
 - **FR-EDIT-8** **Select by filter**, as palette commands acting on the current étage: "Sélectionner tout le circuit …", "Sélectionner tous les symboles de type …" (prises, lampes, interrupteurs…), "Sélectionner les textes à police ou taille personnalisée" (FR-TXT-3), "Sélectionner les symboles sans circuit". More filters are added on need.
 
 ### 6.4b Quickbar and circuit focus
 
 - **FR-QB-1** **Quickbar**: 9 slots, activated by the keys **1–9**. A slot holds a **tool preset**: a tool plus its properties (e.g. "lampe", "prise count 3", "porte 800 mm", "mur de poids 2 mm"). The active circuit is not part of a preset (it stays under the author's control with `C`).
 - **FR-QB-2** The quickbar is displayed on screen (numbered slots, current one highlighted). A preset is shown with its symbol/tool icon.
-- **FR-QB-3** How slots are filled, and whether the quickbar belongs to the project or to the user: **undecided**, section 18 (WA-1). **Interim, as built:** palette commands "Barre rapide : mémoriser l'outil actuel dans la case N" fill a slot from the current tool and its settings, "vider toutes les cases" empties them; slots live as long as the window and are not saved.
+- **FR-QB-3** **Filling a slot (decided):** **Ctrl + digit** stores the active tool and its settings in that slot (press `W`, then `Ctrl+1`: the wall is in slot 1); a plain **digit** only uses a slot, and does nothing on an empty one except a notice. The select tool cannot be stored. The palette commands "Barre rapide : mémoriser…" remain. **The quickbar belongs to the user and to the project (decided):** it is kept in the user's preferences (`user://prefs.json`, `quickbars`) under the project file, so another user, or the same user in another project, has another quickbar. A project that has never been saved has no file to key on: its slots are written at the first save.
 - **FR-FOCUS-1** **Circuit focus** lives in the side panel that already lists the circuits with their colours. A **click** on a circuit greys it out (out of focus: its symbols are drawn light grey, are not box-selectable and are not picked by the pipette; they stay visible). A second click restores it.
 - **FR-FOCUS-2** **Double-click** a circuit = **solo**: every other circuit is greyed out. Double-clicking the solo circuit again **restores the visibility state from before the solo**.
 - **FR-FOCUS-3** Focus is **view state** (per window, not in the Document, not exported, not undoable; ARCH-7). Walls, openings and labels are never affected by it.
@@ -249,7 +251,11 @@ Vim-like: a **Normal** mode (select) and tool states. `Esc` always returns to Se
 | `Shift+I` | Interrupteur va-et-vient |
 | `P` | Prise |
 | `A` | **Pipette**: switch to the tool of the item under the cursor (FR-SYM-9) |
-| `1`–`9` | **Quickbar** slots (FR-QB) |
+| `1`–`9` | **Quickbar**: use the slot (FR-QB) |
+| `Ctrl+1`–`Ctrl+9` | **Quickbar**: store the active tool in the slot (FR-QB-3) |
+| `Shift` + right-click / left-click | Copy / paste settings of the entity under the cursor (FR-EDIT-7) |
+| `Alt` + drag a symbol onto another | Anchor it (FR-STACK-2); `Alt` + right-click detaches |
+| `Ctrl` + click | Add to or remove from the selection (FR-EDIT-1) |
 | `C` then letter | Circuit: sets the active circuit, or reassigns the selection (FR-SYM-7) |
 | `X` then digit | Set `count` (FR-SYM-6) |
 | `H` / `V` | Flip horizontally / vertically |
@@ -259,6 +265,8 @@ Vim-like: a **Normal** mode (select) and tool states. `Esc` always returns to Se
 | `Ctrl+T` | New étage tab |
 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | Next / previous tab |
 | `Ctrl+P` | Command palette (fuzzy search) |
+| `Ctrl+S` / `Ctrl+Shift+S` / `Ctrl+O` | Save / save as / open (decided; `Ctrl+Shift+S` is the usual companion of `Ctrl+S`) |
+| `Ctrl+E` | Export, **reserved**: to be linked when the export exists (M6) |
 | `Ctrl+Z` / `Ctrl+Y` | Undo / redo |
 | `Ctrl+C/X/V`, `Ctrl+D` | Copy / cut / paste, duplicate selection |
 | `Tab` / `Enter` | In the report panel: next issue / acknowledge |
@@ -339,6 +347,11 @@ The unifilaire is a **sheet kind** whose content is the sum of **computed** and 
   - cartouche required fields empty (error)
   - objects outside page (warning)
 - **FR-RPT-5** When an export is made with open errors, a **"PROVISOIRE" mark** is added **in the cartouche area**, cleanly **not touching any border or line**, as its own SVG group (`id="provisoire"`) so that someone unhappy with it can delete it in Affinity or Inkscape. On by default; the setting is changeable at any time.
+- **FR-RPT-6** **Rules file.** The engine reads `rules.json` of the pack, and falls back to `rules.template.json` (every value `null`). A rule whose value is `null` is **not applied** and appears as one warning "Règle non configurée : <règle>", so a missing value never passes silently. Rules that need no RGIE value (symbol without circuit or index, switch without consumer, lamp without switch, missing head chain, defaulted protection, empty required cartouche fields, objects outside the page, unifilaire layout warnings) always apply.
+- **FR-RPT-7** **Issues** carry a rule id, a severity, a French message, where to look (an étage and symbols, a circuit column, a head item, or the unifilaire) and a **key** (rule id + subjects + a hash of the data the message is about). Issues about many things of one étage (symbols without circuit, objects outside the page) are one issue listing them. Order: errors before warnings, then rule order, then subject, so the list is deterministic.
+- **FR-RPT-8** **Acknowledgements** are stored in the project (`acknowledgements`, key to `true`, format 4) and are commands, so undoable. Acknowledging hides the issue until its key changes, which happens when the data it is about changes. Acknowledged issues stay listed, greyed, and can be un-acknowledged.
+- **FR-RPT-9** **Panel.** A docked panel in the right column lists the issues with their counts (errors, warnings, acknowledged). `Tab` selects the next open issue and the app **goes to its subject** (switches tab, selects the symbols or the unifilaire column, centres the view); `Enter` acknowledges the selected one. Both keys act only while the list has the focus; the palette has "Rapport : parcourir les problèmes" (no key assigned) to give it the focus. The panel can be hidden from the Affichage menu and never blocks anything.
+- **FR-RPT-10** **CLI** `validate <project> [--strict]` prints the issues as JSON and exits 0 (1 with `--strict` when errors are open), so the report can be a scripted check.
 
 ## 10. Architecture (ARCH) **[TECH]**
 
@@ -470,13 +483,13 @@ Added later **on need**. Seed content for `catalog.json`:
 - **FR-BRAND-1** The mark is a **four-petal wallflower** (the giroflée): rounded petals, two yellow and two green alternating around a small dark centre with a white ring, outlined in Latte text colour `#4c4f69`; yellow `#F5D928`, green `#319447` (conductor colours, decided in the logo discussion). No lettering.
 - **FR-BRAND-2** It exists as **SVG** (`assets/branding/logo.svg`, with the four fine inner lines) and a **simplified SVG without them** for small sizes, and must stay readable at **32 × 32 px** (an automated test checks that the rendered 32 px mark still contains both colours and the outline).
 - **FR-BRAND-3** Generated assets (committed): PNG sizes, a multi-size **`icon.ico`** (16 to 256 px), and a **boot splash** that shows the Giroflée mark **together with the Godot logo** ("Fait avec Godot", Godot logo CC BY 4.0, attribution in `third_party/NOTICE`) on a Latte background. The window icon is set at run time.
-- **FR-BRAND-4** The Windows executable carries the logo: the export preset sets `application/icon` to `icon.ico` and `modify_resources`, and the release job installs Wine and `rcedit` (v2.0.0) and points Godot at them through its editor settings. A failed rcedit step fails the release instead of silently shipping the default icon. First verified by the next CI release (it cannot be run on a Windows development machine the same way).
+- **FR-BRAND-4** The Windows executable carries the logo without any extra tool: Godot 4.4 and later write the icon into the exe themselves. The export preset sets `application/icon` to `icon.ico` (all sizes from 16 to 256 px, so no size falls back to Godot's icon) with `modify_resources` on, and the project setting `application/config/windows_native_icon` gives the running window the same icon in the taskbar. Windows may show an old icon until its icon cache is cleared (`ie4uinit.exe -show`).
 
 ## 13. Export and persistence
 
 ### 13.1 Project file
-- **FR-FILE-1** Single file `*.giroflee`, **plain JSON**, UTF-8, pretty-printed with stable key order and entities sorted by id, so it diffs cleanly in git. Contains `format_version`, `pack_ref`, config, cartouche, board, circuits, sheets, entities, acknowledgements and the optional `ui` block.
-- **FR-FILE-2** `format_version` plus an explicit **migration** chain; an older file MUST open (never silently drop data). Format 2 (M2b) moves the frame, title position, ghost on/off and hints from each sheet to the project `config`; the migration takes the values of the first sheet. Format 3 (M4) adds the unifilaire sheet (FR-TAB-1) as the first sheet of a file that has none.
+- **FR-FILE-1** Single file `*.giroflee`, **plain JSON**, UTF-8, pretty-printed with stable key order and entities sorted by id, so it diffs cleanly in git. Contains `format_version`, `pack_ref`, config, cartouche, board, circuits, acknowledgements, sheets, entities and the optional `ui` block.
+- **FR-FILE-2** `format_version` plus an explicit **migration** chain; an older file MUST open (never silently drop data). Format 2 (M2b) moves the frame, title position, ghost on/off and hints from each sheet to the project `config`; the migration takes the values of the first sheet. Format 3 (M4) adds the unifilaire sheet (FR-TAB-1) as the first sheet of a file that has none. Format 4 (M5) adds the empty `acknowledgements` object (FR-RPT-8).
 - **FR-FILE-3** Autosave with silent recovery; no "save changes?" prompt.
 - **FR-FILE-4** Background images are stored beside the project (`<name>.giroflee.assets/`), referenced by relative path.
 
@@ -548,24 +561,18 @@ Every milestone is done only when its tests (WA-6, section 15.3) pass in CI.
 
 ## 18. Decisions log and pending items
 
+**Decided since draft 1.0 (answers of the author):** the quickbar belongs to the user and the project (FR-QB-3); save, save as and open are `Ctrl+S`, `Ctrl+Shift+S`, `Ctrl+O`, and `Ctrl+E` is reserved for export; box selection takes what is fully inside; walls look like walls from the first segment, A4/A3 hints are project-wide and paper size and scale stay per sheet; the logo, the generic rotation cursor and the Vulkan renderer requirement are accepted; the M3 interpretations (labels placed on placement and by command, `X` digits 1 to 9 with the numpad, `C` letter, pipette sets the wall weight, no grey-block style, placeholder pack artwork); the unifilaire layout and its blue accent. 
+
 **Decided since draft 0.2:** pipette semantics as in FR-SYM-9; stacks = anchoring (FR-STACK); wall line weight = page weight; headless CLI required (ARCH-10); test strategy (15.3); copy settings (FR-EDIT-7); select by filter as commands (FR-EDIT-8); quickbar 1–9 (FR-QB); circuit focus click/solo (FR-FOCUS); no "zoom to content" and no drag-to-repeat or saved-selection library. The exact file schema and the unifilaire pixel layout are **inferred from use** and documented during implementation (`FILE_FORMAT.md`, golden files).
 
 **Pending (per WA-1 nothing below is implemented until the author answers):**
 1. **Rule values:** the author fills in `packs/belgium/rules.template.json` later. Until then every rule reports "règle non configurée". Catalogue extras (e.g. the 25 A breaker the author owns) are added on need.
-2. **Quickbar:** the interim fill-from-the-palette behaviour of FR-QB-3 is in; the final way to fill a slot (e.g. pick up with the pipette, then assign) and whether the quickbar belongs to the project or to the user are still to decide.
-3. **Keys or gestures** for: anchoring (FR-STACK-2), copy/paste settings (FR-EDIT-7). They exist only as palette commands for now.
+3. ~~Keys or gestures for anchoring and copy/paste settings~~ decided (FR-STACK-2, FR-EDIT-7).
 4. **Keys marked ASSUMED in M2, to confirm or change:** `Delete` / `Backspace` (delete selection), `Ctrl+A` (select all), arrow keys (nudge by one grid step), `Enter` and double-click (finish a wall), `Backspace` while drawing a wall (remove the last point), double-click on a text (edit it), wheel step sizes (60 px pan, 1.15 zoom).
-5. **Save and open keys:** `Ctrl+S` / `Ctrl+O` (or others) are not bound; "Enregistrer", "Enregistrer sous…" and "Ouvrir un projet…" are palette commands only.
-6. **Box selection semantics:** it selects entities that touch the box (not only those fully inside).
 7. **Palette command for the page fit:** none (the author declined "zoom to content"); the page is fitted when an étage is first shown.
-8. **M2b interpretations to confirm:** (a) feedback "the wall just draw as soon as we start" is read as *the wall should look like a wall from the first segment on* (FR-PREV), not as "commit each segment immediately"; (b) A4/A3 hints are made project-wide together with the frame, title and ghost switch (the author listed the first three; hints are a display aid of the same kind); (c) paper size and scale stay per sheet.
-9. **Executable icon:** done through Wine and `rcedit` in the Linux release job (FR-BRAND-4); to confirm on the first CI release, otherwise build the export on a Windows runner.
-11. **Logo fidelity:** the vector logo is a hand-built approximation of the supplied raster (petal shape, notch and inner lines are close, not identical); a drawn SVG would replace it.
-12. **Renderer change:** the project now needs a Vulkan-capable GPU for smooth diagonals (older machines fall back to OpenGL with the lighter outline-based smoothing). Confirm this is acceptable for the target users.
-10. **Rotation cursor:** Godot has no rotation cursor; a generic cursor is used until a custom one is drawn.
-13. **M3 interpretations to confirm:** (a) the label solver is not re-run automatically when a symbol moves (FR-SYM-5 says "placement or move"); (b) `X` then a digit sets counts 1 to 9 only (more through the Properties panel); (c) `C` then a letter with symbols selected moves them to that circuit, and only changes the active circuit when nothing is selected; (d) digit keys 1 to 9 are read from the physical key so the top row works on AZERTY; (e) the pipette on a wall also sets the project wall weight (an undoable change); (f) a grey block has no style property yet, so "Copier les propriétés" has nothing to copy from it; (g) the placeholder artwork of the pack symbols is a first approximation of the author's plans and is to be redrawn.
-15. **M4 interpretations to confirm:** (a) the accent of the unifilaire button is the theme blue; (b) the unifilaire layout (head chain stacked at the left flowing up into a horizontal bus, circuits as columns, shared row ruler) is my reading of the plans described, not a copy of the author's own unifilaire: tell me what to change; (c) the "usual head chain" command (meter, cable, 300 mA differential, cable, main breaker) is a convenience, not an automatic default; (d) the unifilaire sheet keeps `scale_den` 1 (page millimetres) and its name can be edited; (e) devices on the bus are drawn inline and do not yet draw the bracket of what they protect; (f) the cartouche grid is fixed (no resizing yet).
-14. **Anchoring gesture:** "Ancrer à un symbole" asks for a click on the parent symbol; nothing draws the link between a stack's symbols yet.
+16. **M5 interpretations to confirm:** (a) issues about many symbols of one étage are one issue listing them; (b) a lamp without a switch is a warning, a socket alone is not (pack flag `needs_control`); (c) the differential rule looks at the symbol types named in `rules.json` and at the differentials in the head chain and on the bus in front of the circuit; the bathroom keyword variant of that rule is not applied; (d) the head chain requirements (`head_chain_required`) apply only once set in `rules.json`, an empty head chain is always an error; (e) the report is on by default and can be hidden from the Affichage menu; (f) `Tab` and `Enter` work while the list has the focus, and the palette command "Rapport : parcourir les problèmes" gives it the focus (no key assigned).
+17. **Rules file:** fill `packs/belgium/rules.template.json` and save it as `rules.json` (max points per circuit, breaker and cable pairs, differential rules, bathroom radius, head chain requirements); until then each is listed as "règle non configurée".
+14. **Stack links:** the palette command "Ancrer à un symbole" asks for a click on the parent symbol; nothing draws the link between a stack's symbols yet.
 
 ## 19. Implementation notes (kept in sync with the code)
 
@@ -634,7 +641,7 @@ Every milestone is done only when its tests (WA-6, section 15.3) pass in CI.
 
 **Interaction as built** (keys approved in section 7 unless marked ASSUMED, see section 18):
 - Tools `W D F E S T`, `Esc` (cancel, then select tool, then clear selection), `H` `V` flip and `R` / `Shift+R` rotate (the placement ghost while a placement tool is active, the selection otherwise), `Ctrl+Z/Y/C/X/V/D`, `Ctrl+T/Tab/Shift+Tab/N/P`, `F2`.
-- Select tool: click, Shift+click, box (touching entities), drag to move with snapping, double-click a text to edit it; vertex handles on a selected wall (a closed loop stays closed), corner handles on a grey block.
+- Select tool: click, Ctrl+click, box (entities fully inside), drag to move with snapping, double-click a text to edit it; vertex handles on a selected wall (a closed loop stays closed), corner handles on a grey block.
 - Wall tool: click adds a point (orthogonal to the previous one unless Shift), double-click or Enter finishes (ASSUMED), clicking the first point closes the loop, Backspace removes the last point (ASSUMED), Esc abandons.
 - Pan and zoom: wheel pans vertically, Shift+wheel horizontally, Ctrl+wheel zooms around the cursor (factor 1.15 per notch, 60 px pan per notch: ASSUMED values), Space+drag and middle-drag pan. The initial view fits the page and keeps following the viewport size until the user pans or zooms.
 - ASSUMED conventional keys named by FR-EDIT-1: `Delete` / `Backspace` deletes the selection, `Ctrl+A` selects all, arrow keys nudge by one grid step.
@@ -680,7 +687,7 @@ No third-party plugin was needed. `tests/visual/test_antialiasing.gd` (opt-in, n
 
 **Branding.** `assets/branding/logo.svg` (with veins) and `logo_small.svg` (no veins, thicker outline, for 16 to 48 px) are a first hand-built vector approximation of the supplied raster mark; replace them with a drawn vector if one exists and run `godot --headless --path . -s tools/make_branding.gd` to regenerate `icon.png`, `icon.ico` (16 to 256 px) and `splash.png`. The splash shows the mark above the Godot logo (`godot_logo.svg`, CC BY 4.0, licence text and NOTICE entry included). Tests render the logo at 256 px and 32 px and check the yellow, green and outline colours, the alternation of the petals, the ICO structure and the splash.
 
-**Known limits.** The Windows executable keeps the default icon (embedding needs `rcedit`, section 18); the engine's default font is still used (M7); the rotation handle uses a generic cursor.
+**Known limits.** The engine's default font is still used (M7); the rotation handle uses a generic cursor.
 
 
 ### 19.6 M3: electric symbols, as built
@@ -699,7 +706,7 @@ No third-party plugin was needed. `tests/visual/test_antialiasing.gd` (opt-in, n
 
 **Tests.** `test_svg_art`, `test_symbol_library`, `test_symbol_geometry`, `test_numbering_and_circuits`, `test_anchoring`, `test_label_solver`, `test_symbol_tools`, `test_symbol_commands`, and in the real window `test_symbol_ui` and `test_m3_workflow` (a room, a lamp, its Alt-placed switch, sockets against the wall, a triple socket, circuit change by keyboard, pipette). `tests/visual` has an opt-in screenshot of the electrical plan with and without circuit focus.
 
-**Known limits.** The pack artwork is a first approximation to be redrawn from the author's plans; the TGBT and kWh markers have no toolbar button; the unifilaire (M4) does not exist yet; stack links are not drawn.
+**Known limits.** The pack artwork is a first approximation to be redrawn from the author's plans; the TGBT and kWh markers have no toolbar button; stack links are not drawn.
 
 ### 19.7 M4: unifilaire, tabs, board and cartouche, as built
 
@@ -718,3 +725,17 @@ No third-party plugin was needed. `tests/visual/test_antialiasing.gd` (opt-in, n
 **Tests.** `test_unifilaire_sheet`, `test_catalog_and_board`, `test_unifilaire_derive`, `test_unifilaire_render`, `test_cartouche`, `test_board_editing`, and in the real window `test_tabs` and `test_unifilaire_ui`; the format, the golden file and the old tests that counted sheets were updated. `tests/visual` has an opt-in screenshot of the unifilaire.
 
 **Known limits.** No report panel yet (M5): the `?`, the missing head chain and the defaulted values are only drawn, not listed; the cartouche grid is fixed; the bus bracket of what a device protects is not drawn; one page only (no scale-to-fit beyond squeezing rows and columns); circuit titles are one or two lines.
+
+### 19.8 M5: report and rules, as built
+
+**Data.** `Issue` (rule, severity, message, where to look, key, acknowledged), `Rules` (reads the pack's `rules.json`, else `rules.template.json`; typed accessors that return "not configured" for `null`), `ReportBuilder.build(doc)` (pure, deterministic, errors first then `RULE_ORDER` then key) and `open_errors(doc)` for the PROVISOIRE mark of M6. The key is `rule:` plus a short SHA-256 of rule, sorted subjects, circuit, head item and the data the message is about. Format **4** adds `acknowledgements` (key to `true`; `doc.set` accepts only `true`, `doc.unset` reopens); `Migrations._v3_to_v4`.
+
+**Rules in.** Symbol without circuit or index (per étage), control without consumer, lamp without control, missing head chain (and, once configured, missing meter, differential or breaker), empty required cartouche fields, defaulted breaker or cable, objects outside the page, unifilaire layout warnings, and, driven by `rules.json`: maximum points per circuit, breaker and cable pairs, differential in front of a symbol type, bathroom proximity. Catalogue items gained `rating_a`, `section_mm2`, `residual_ma`; symbol types gained `needs_control`.
+
+**Editor.** `EditorModel.issues()` (cached per document revision), `goto_issue` (switches tab, selects the symbols and centres the view, or selects the unifilaire column or head item), `go_next_issue`, `acknowledge_selected_issue`, `unacknowledge_issue`, `report_visible` (view state). `ReportPanel` sits in the right column between the circuits and the properties: counts, the list (✖ error, ⚠ warning, ✓ acknowledged), "Suivant", "Reconnaître", "Rouvrir"; `Tab` and `Enter` act while the list has the focus. Affichage menu: Rapport. Palette: "Rapport : problème suivant", "Rapport : afficher ou masquer", "Rapport : parcourir les problèmes". CLI: `validate <project> [--strict]`.
+
+**Gestures decided with the author in this round** (section 7 table): `Ctrl+digit` stores a quickbar slot, `Shift` + right-click / left-click copies / pastes settings, `Alt` + drag anchors, `Alt` + right-click detaches, `Ctrl` replaces `Shift` for selection toggling; see FR-QB-3, FR-EDIT-7, FR-STACK-2, FR-EDIT-1.
+
+**Tests.** `test_report`, `test_report_navigation`, `test_gestures`, and in the real window `test_report_ui`; `test_cli` covers `validate`.
+
+**Known limits.** No rule values exist yet (the author fills `rules.json`); the bathroom keyword variant of the differential rule, circuits not behind a differential by room, and the PROVISOIRE mark itself (M6) are not built; there is no per-rule switch to turn a rule off besides acknowledging its issues.

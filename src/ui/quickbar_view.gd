@@ -50,11 +50,11 @@ func sync() -> void:
 		var filled: bool = model.quickbar.is_filled(slot)
 		button.text = str(slot)
 		button.icon = null
-		button.tooltip_text = "Case %d : vide (palette de commandes : « Barre rapide »)" % slot
+		button.tooltip_text = "Case %d : vide (Ctrl+%d mémorise l'outil actuel)" % [slot, slot]
 		if filled:
 			var preset: Dictionary = model.quickbar.preset(slot)
 			var tool: String = preset["tool"]
-			button.tooltip_text = "Case %d : %s" % [slot, tool]
+			button.tooltip_text = "Case %d : %s (Ctrl+%d la remplace)" % [slot, tool, slot]
 			if IconLibrary.names().has(tool):
 				button.icon = IconLibrary.texture(tool, ICON_PX)
 		button.set_pressed_no_signal(filled and str(model.quickbar.preset(slot)["tool"]) == model.tool_name)

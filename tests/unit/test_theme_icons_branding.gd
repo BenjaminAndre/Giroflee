@@ -259,3 +259,10 @@ func test_runtime_svg_files_are_exported_as_is() -> void:
 			if file.ends_with(".svg"):
 				var meta: String = FileAccess.get_file_as_string("%s/%s.import" % [dir, file])
 				assert_string_contains(meta, "importer=\"keep\"", "%s/%s must be kept as a plain file" % [dir, file])
+
+
+func test_the_windows_exe_and_window_use_the_logo_icon() -> void:
+	var preset: String = FileAccess.get_file_as_string("res://export_presets.cfg")
+	assert_string_contains(preset, "application/icon=\"res://assets/branding/icon.ico\"")
+	assert_string_contains(preset, "application/modify_resources=true")
+	assert_eq(ProjectSettings.get_setting("application/config/windows_native_icon"), "res://assets/branding/icon.ico")

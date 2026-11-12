@@ -24,13 +24,13 @@ func test_click_selects_and_clicking_empty_space_clears() -> void:
 	assert_eq(kit.model.selection, [])
 
 
-func test_shift_click_toggles_membership() -> void:
+func test_ctrl_click_toggles_membership() -> void:
 	var a: String = _wall([[2000, 2000], [8000, 2000]])
 	var b: String = _wall([[2000, 6000], [8000, 6000]])
 	kit.click(Vector2(5000, 2000))
-	kit.click(Vector2(5000, 6000), true)
+	kit.click(Vector2(5000, 6000), false, false, false, true)
 	assert_eq(kit.model.selection, [a, b])
-	kit.click(Vector2(5000, 2000), true)
+	kit.click(Vector2(5000, 2000), false, false, false, true)
 	assert_eq(kit.model.selection, [b])
 
 
@@ -43,11 +43,11 @@ func test_box_selection_selects_what_it_touches() -> void:
 	assert_true(kit.model.selection.has(a) and kit.model.selection.has(b))
 
 
-func test_shift_box_adds_to_the_selection() -> void:
+func test_ctrl_box_adds_to_the_selection() -> void:
 	var a: String = _wall([[2000, 2000], [4000, 2000]])
 	var far: String = _wall([[15000, 12000], [16000, 12000]])
 	kit.click(Vector2(3000, 2000))
-	kit.drag(Vector2(14500, 11500), Vector2(16500, 12500), true)
+	kit.drag(Vector2(14500, 11500), Vector2(16500, 12500), false, true)
 	assert_true(kit.model.selection.has(a) and kit.model.selection.has(far))
 
 

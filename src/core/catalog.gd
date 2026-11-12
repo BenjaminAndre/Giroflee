@@ -17,6 +17,10 @@ class Item:
 	## Text drawn on the unifilaire, and an optional second line.
 	var label: String = ""
 	var detail: String = ""
+	## Breaker or differential rating (A), cable section (mm2), differential residual current (mA); 0 when not applicable.
+	var rating_a: int = 0
+	var section_mm2: float = 0.0
+	var residual_ma: int = 0
 
 
 var pack_id: String = ""
@@ -92,6 +96,9 @@ func _load(path: String) -> void:
 		built.title = str(entry.get("title", built.id))
 		built.label = str(entry.get("label", built.title))
 		built.detail = str(entry.get("detail", ""))
+		built.rating_a = JsonUtil.to_int(entry["rating_a"]) if JsonUtil.is_integral(entry.get("rating_a")) else 0
+		built.section_mm2 = JsonUtil.to_float(entry["section_mm2"]) if JsonUtil.is_number(entry.get("section_mm2")) else 0.0
+		built.residual_ma = JsonUtil.to_int(entry["residual_ma"]) if JsonUtil.is_integral(entry.get("residual_ma")) else 0
 		if built.id.is_empty() or items.has(built.id) or not KINDS.has(built.kind):
 			problems.append("%s: invalid or duplicate item '%s'" % [path, built.id])
 			continue

@@ -16,7 +16,8 @@
       "attach": "free",
       "counts_as_point": true,
       "uses_circuit": true,
-      "role": "consumer"
+      "role": "consumer",
+      "needs_control": true
     },
     "switch": {
       "title": "Interrupteur",

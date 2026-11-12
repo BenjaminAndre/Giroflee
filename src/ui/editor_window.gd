@@ -18,6 +18,7 @@ var toolbar: ToolPalette
 var canvas: CanvasView
 var panel: PropertiesPanel
 var circuits: CircuitPanel
+var report_panel: ReportPanel
 var quickbar_view: QuickbarView
 var palette: PaletteOverlay
 var tabs: TabBar
@@ -99,6 +100,8 @@ func _init() -> void:
 	split.add_child(side)
 	circuits = CircuitPanel.new()
 	side.add_child(circuits)
+	report_panel = ReportPanel.new()
+	side.add_child(report_panel)
 	panel = PropertiesPanel.new()
 	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	side.add_child(panel)
@@ -164,9 +167,15 @@ func open_document(doc: Document, p_path: String = "") -> void:
 	model.rename_requested.connect(_on_rename_requested)
 	input.palette_requested.connect(open_palette)
 	input.new_window_requested.connect(new_window)
+	input.save_requested.connect(save)
+	input.save_as_requested.connect(save_as)
+	input.open_requested.connect(open_project)
+	_load_quickbar()
+	model.quickbar_changed.connect(_save_quickbar)
 	canvas.bind(model, input)
 	panel.bind(model)
 	circuits.bind(model)
+	report_panel.bind(model)
 	quickbar_view.bind(model)
 	toolbar.bind(model)
 	_saved_revision = model.revision
@@ -175,6 +184,18 @@ func open_document(doc: Document, p_path: String = "") -> void:
 	_update_status()
 	_update_title()
 	canvas.grab_focus.call_deferred()
+
+
+## The quickbar belongs to the user and to the project (SRD FR-QB-3): it is kept in the user's
+## preferences under the project file, so another user, or another project, has its own.
+func _load_quickbar() -> void:
+	if not project_path.is_empty():
+		model.quickbar.load_data(UserPrefs.quickbar_for(project_path))
+
+
+func _save_quickbar() -> void:
+	if not project_path.is_empty() and model != null:
+		UserPrefs.set_quickbar(project_path, model.quickbar.to_data())
 
 
 func is_dirty() -> bool:
@@ -226,6 +247,7 @@ func _write_to(path: String) -> void:
 		_show_notice(error)
 		return
 	project_path = target
+	_save_quickbar()
 	_saved_revision = model.revision
 	autosave()
 	_update_title()
@@ -284,9 +306,9 @@ func _build_menus() -> void:
 	# so the editor's own key handling stays the single place where keys are interpreted
 	_add_menu("Fichier", [
 		{"text": "Nouveau projet (nouvelle fenêtre)", "hint": "Ctrl+N", "do": func() -> void: new_window(PackedStringArray(["--new"]))},
-		{"text": "Ouvrir…", "do": func() -> void: open_project()},
-		{"text": "Enregistrer", "do": func() -> void: save()},
-		{"text": "Enregistrer sous…", "do": func() -> void: save_as()},
+		{"text": "Ouvrir…", "hint": "Ctrl+O", "do": func() -> void: open_project()},
+		{"text": "Enregistrer", "hint": "Ctrl+S", "do": func() -> void: save()},
+		{"text": "Enregistrer sous…", "hint": "Ctrl+Maj+S", "do": func() -> void: save_as()},
 	])
 	_add_menu("Édition", [
 		{"text": "Annuler", "hint": "Ctrl+Z", "do": func() -> void: model.undo()},
@@ -322,6 +344,7 @@ func _build_menus() -> void:
 		{"text": "Étage fantôme", "do": func() -> void: model.toggle_ghost(), "state": func() -> bool: return _config_flag("ghost_on")},
 		{"text": "Repères A4 / A3", "do": func() -> void: model.toggle_hints(), "state": func() -> bool: return _config_flag("hints")},
 		{"text": "Accrochage", "do": func() -> void: EditorCommands.toggle_snap(model), "state": func() -> bool: return model.snap_enabled},
+		{"text": "Rapport", "do": func() -> void: model.set_report_visible(not model.report_visible), "state": func() -> bool: return model.report_visible},
 		{"text": "Barre d'outils", "do": func() -> void: set_toolbar_visible(not toolbar.visible), "state": func() -> bool: return toolbar.visible},
 	])
 	_add_menu("Projet", [
@@ -398,10 +421,11 @@ func _refresh_menu(title: String) -> void:
 
 func open_palette() -> void:
 	var entries: Array[EditorCommands.Entry] = EditorCommands.build(model)
-	entries.append(EditorCommands.Entry.new("file.open", "Ouvrir un projet…", "", open_project))
-	entries.append(EditorCommands.Entry.new("file.save", "Enregistrer", "", save))
-	entries.append(EditorCommands.Entry.new("file.save_as", "Enregistrer sous…", "", save_as))
+	entries.append(EditorCommands.Entry.new("file.open", "Ouvrir un projet…", "Ctrl+O", open_project))
+	entries.append(EditorCommands.Entry.new("file.save", "Enregistrer", "Ctrl+S", save))
+	entries.append(EditorCommands.Entry.new("file.save_as", "Enregistrer sous…", "Ctrl+Maj+S", save_as))
 	entries.append(EditorCommands.Entry.new("file.new", "Nouveau projet (nouvelle fenêtre)", "Ctrl+N", new_window.bind(PackedStringArray(["--new"]))))
+	entries.append(EditorCommands.Entry.new("report.browse", "Rapport : parcourir les problèmes (Tab, Entrée)", "", report_panel.browse))
 	palette.open(entries)
 	palette.position = Vector2((size.x - palette.custom_minimum_size.x) * 0.5, 70.0)
 

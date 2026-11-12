@@ -60,35 +60,42 @@ func _button(world: Vector2, index: MouseButton, pressed: bool, shift: bool, ctr
 	return input.handle(event)
 
 
-func press(world: Vector2, shift: bool = false, double: bool = false, alt: bool = false) -> void:
-	_button(world, MOUSE_BUTTON_LEFT, true, shift, false, alt, double)
+func press(world: Vector2, shift: bool = false, double: bool = false, alt: bool = false, ctrl: bool = false) -> void:
+	_button(world, MOUSE_BUTTON_LEFT, true, shift, ctrl, alt, double)
 
 
-func release(world: Vector2, shift: bool = false) -> void:
-	_button(world, MOUSE_BUTTON_LEFT, false, shift, false, false, false)
+## A right-click (press only, as the editor acts on the press).
+func rclick(world: Vector2, shift: bool = false, alt: bool = false) -> bool:
+	return _button(world, MOUSE_BUTTON_RIGHT, true, shift, false, alt, false)
 
 
-func move(world: Vector2, shift: bool = false) -> void:
+func release(world: Vector2, shift: bool = false, ctrl: bool = false, alt: bool = false) -> void:
+	_button(world, MOUSE_BUTTON_LEFT, false, shift, ctrl, alt, false)
+
+
+func move(world: Vector2, shift: bool = false, ctrl: bool = false, alt: bool = false) -> void:
 	var event: InputEventMouseMotion = InputEventMouseMotion.new()
 	event.position = screen(world)
 	event.global_position = event.position
 	event.shift_pressed = shift
+	event.ctrl_pressed = ctrl
+	event.alt_pressed = alt
 	input.handle(event)
 
 
-func click(world: Vector2, shift: bool = false, double: bool = false, alt: bool = false) -> void:
-	move(world, shift)
-	press(world, shift, double, alt)
-	release(world, shift)
+func click(world: Vector2, shift: bool = false, double: bool = false, alt: bool = false, ctrl: bool = false) -> void:
+	move(world, shift, ctrl, alt)
+	press(world, shift, double, alt, ctrl)
+	release(world, shift, ctrl, alt)
 
 
-func drag(from: Vector2, to: Vector2, shift: bool = false) -> void:
-	move(from, shift)
-	press(from, shift)
+func drag(from: Vector2, to: Vector2, shift: bool = false, ctrl: bool = false, alt: bool = false) -> void:
+	move(from, shift, ctrl, alt)
+	press(from, shift, false, alt, ctrl)
 	var steps: int = 4
 	for i: int in range(1, steps + 1):
-		move(from.lerp(to, float(i) / float(steps)), shift)
-	release(to, shift)
+		move(from.lerp(to, float(i) / float(steps)), shift, ctrl, alt)
+	release(to, shift, ctrl, alt)
 
 
 func wheel(index: MouseButton, at_world: Vector2, shift: bool = false, ctrl: bool = false) -> void:

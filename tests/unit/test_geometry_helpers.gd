@@ -126,17 +126,17 @@ func test_pick_can_exclude_entities() -> void:
 	assert_eq(HitTest.pick(sheet, ctx, Vector2(2000, 0), 20.0, ["w"]), "")
 
 
-func test_box_selection_touches_bounds() -> void:
+func test_box_selection_takes_what_is_fully_inside() -> void:
 	TestKit.add_entity(s, "s1", "far", "grey_block", {"pos": [9000, 9000], "size": [100, 100]})
-	var hit: Array[String] = HitTest.in_rect(sheet, ctx, Rect2(3900, 1000, 300, 300))
-	assert_eq(hit, ["w"], "touches the wall's second segment")
+	var touching: Array[String] = HitTest.in_rect(sheet, ctx, Rect2(3900, 1000, 300, 300))
+	assert_eq(touching, [], "touching is not enough")
 	var all: Array[String] = HitTest.in_rect(sheet, ctx, Rect2(-100, -100, 20000, 20000))
 	assert_eq(all, ["far", "w"])
 
 
 func test_box_selection_accepts_a_rect_dragged_in_any_direction() -> void:
-	var flipped: Array[String] = HitTest.in_rect(sheet, ctx, Rect2(4200, 1300, -300, -300))
-	assert_eq(flipped, ["w"])
+	var flipped: Array[String] = HitTest.in_rect(sheet, ctx, Rect2(20000, 20000, -20100, -20100))
+	assert_eq(flipped, ["far", "w"] if sheet.entities.has("far") else ["w"])
 
 
 # --- remove unhosts openings ----------------------------------------------------------------

@@ -5,7 +5,7 @@ extends Tool
 ## wall vertex or resize a grey block, drag a symbol's circuit label or count badge to place it by
 ## hand, which pins it (SRD FR-EDIT-1, FR-SYM-5). Each gesture is one undo step.
 
-enum Mode { IDLE, BOX, MOVE, HANDLE, TRANSFORM, LABEL }
+enum Mode { IDLE, BOX, MOVE, HANDLE, TRANSFORM, LABEL, ANCHOR }
 
 var _mode: Mode = Mode.IDLE
 var _target_id: String = ""
@@ -28,6 +28,9 @@ var _label_key: String = ""
 var _label_grab: Vector2 = Vector2.ZERO
 var _label_props: Dictionary = {}
 var _label_moved: bool = false
+# Alt + drag onto another symbol anchors (FR-STACK-2)
+var _anchor_ids: Array[String] = []
+var _anchor_hover: Vector2 = Vector2.ZERO
 
 
 func tool_name() -> String:
@@ -84,6 +87,13 @@ func press(model: EditorModel, input: ToolInput) -> void:
 		_label_moved = false
 		return
 	var picked: String = HitTest.pick(model.sheet(), model.ctx(), input.world, input.tolerance, model.focus_excluded(), model.spatial())
+	if not picked.is_empty() and input.shift:
+		# Shift + click pastes the copied settings onto what is under the cursor (FR-EDIT-7)
+		model.paste_settings_to(picked)
+		return
+	if not picked.is_empty() and input.alt and model.sheet().entities[picked].type == "symbol":
+		_begin_anchor(model, picked, input.world)
+		return
 	if not picked.is_empty():
 		if input.double_click:
 			var entity: Entity = model.sheet().entities[picked]
@@ -91,7 +101,7 @@ func press(model: EditorModel, input: ToolInput) -> void:
 				model.set_selection([picked])
 				model.edit_selection_text()
 				return
-		if input.shift:
+		if input.ctrl:
 			model.toggle_selected(picked)
 			return
 		_collapse_on_release = model.selection.has(picked) and model.selection.size() > 1
@@ -102,7 +112,9 @@ func press(model: EditorModel, input: ToolInput) -> void:
 		_delta = Vector2i.ZERO
 		_press_snap = model.snap(input.world, model.selection).pos
 		return
-	if not input.shift:
+	if input.shift:
+		return
+	if not input.ctrl:
 		model.clear_selection()
 	_mode = Mode.BOX
 	_box_start = input.world
@@ -126,6 +138,8 @@ func move(model: EditorModel, input: ToolInput) -> void:
 		Mode.LABEL:
 			_label_props = _props_with_label(model, input.world)
 			_label_moved = true
+		Mode.ANCHOR:
+			_anchor_hover = input.world
 		Mode.IDLE:
 			model.hover_handle = _hover_handle(model, input)
 	model.changed.emit()
@@ -139,7 +153,7 @@ func release(model: EditorModel, input: ToolInput) -> void:
 			var rect: Rect2 = Rect2(_box_start, input.world - _box_start).abs()
 			if rect.size.length() > input.tolerance:
 				var hits: Array[String] = HitTest.in_rect(model.sheet(), model.ctx(), rect, model.focus_excluded(), model.spatial())
-				if input.shift:
+				if input.ctrl:
 					var merged: Array = model.selection.duplicate()
 					for entity_id: String in hits:
 						if not merged.has(entity_id):
@@ -150,7 +164,7 @@ func release(model: EditorModel, input: ToolInput) -> void:
 		Mode.MOVE:
 			if _delta != Vector2i.ZERO:
 				model.move_entities(model.selection.duplicate(), _delta)
-			elif _collapse_on_release and not input.shift:
+			elif _collapse_on_release and not input.ctrl:
 				model.set_selection([_target_id])
 		Mode.HANDLE:
 			if not _handle_props.is_empty():
@@ -160,6 +174,8 @@ func release(model: EditorModel, input: ToolInput) -> void:
 					model.update_entities([{"id": _target_id, "props": diff}])
 	if finished == Mode.TRANSFORM:
 		model.apply_transform(_t_props)
+	if finished == Mode.ANCHOR:
+		_finish_anchor(model, input)
 	if finished == Mode.LABEL:
 		if _label_moved and not _label_props.is_empty():
 			var moved: Entity = model.sheet().entities[_target_id]
@@ -184,6 +200,7 @@ func cancel(model: EditorModel) -> bool:
 	_handle = {}
 	_handle_props = {}
 	_label_props = {}
+	_anchor_ids = []
 	_clear_transform()
 	model.changed.emit()
 	return true
@@ -211,6 +228,18 @@ func overrides(model: EditorModel) -> Dictionary:
 	return out
 
 
+## A line from the symbols being anchored to the pointer.
+func preview(model: EditorModel) -> DrawList:
+	var list: DrawList = DrawList.new()
+	if _mode != Mode.ANCHOR:
+		return list
+	for entity_id: String in _anchor_ids:
+		var entity: Entity = model.sheet().entities[entity_id]
+		var from: Vector2 = EntityGeometry.vec(entity.props["pos"])
+		list.add(DrawOp.polyline(PackedVector2Array([from, _anchor_hover]), PlanTheme.BLUE, model.ctx().page_to_world(0.5), "preview"))
+	return list
+
+
 func has_overlay_rect() -> bool:
 	return _mode == Mode.BOX
 
@@ -220,7 +249,33 @@ func overlay_rect() -> Rect2:
 
 
 func hint(_model: EditorModel) -> String:
-	return "Sélection : clic / Maj+clic, glisser pour encadrer ou déplacer · Suppr = supprimer · R, H, V = tourner / retourner"
+	return "Sélection : clic / Ctrl+clic, glisser pour encadrer ou déplacer · Alt+glisser sur un symbole = l'ancrer · Maj+clic droit / gauche = copier / coller les propriétés · Suppr = supprimer"
+
+
+## The symbols that follow the drag: the selection when the grabbed symbol is part of it, else it alone.
+func _begin_anchor(model: EditorModel, picked: String, world: Vector2) -> void:
+	_anchor_ids = []
+	if model.selection.has(picked):
+		for entity: Entity in model.selected_entities():
+			if entity.type == "symbol":
+				_anchor_ids.append(entity.id)
+	else:
+		_anchor_ids.append(picked)
+	_mode = Mode.ANCHOR
+	_anchor_hover = world
+	model.changed.emit()
+
+
+func _finish_anchor(model: EditorModel, input: ToolInput) -> void:
+	var ids: Array[String] = _anchor_ids.duplicate()
+	var excluded: Array = model.focus_excluded()
+	excluded.append_array(ids)
+	var parent: String = HitTest.pick(model.sheet(), model.ctx(), input.world, input.tolerance, excluded, model.spatial())
+	_anchor_ids = []
+	if parent.is_empty() or model.sheet().entities[parent].type != "symbol":
+		model.notice.emit("Relâchez sur le symbole auquel ancrer")
+		return
+	model.anchor_ids_to(ids, parent)
 
 
 func _handle_at(model: EditorModel, world: Vector2, radius: float) -> Dictionary:

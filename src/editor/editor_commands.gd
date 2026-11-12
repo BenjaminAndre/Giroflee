@@ -61,6 +61,8 @@ static func _add_symbol_commands(model: EditorModel, list: Array[Entry]) -> void
 		var def: SymbolLibrary.Def = library.def(type)
 		list.append(Entry.new("tool.symbol.%s" % type, "Outil %s" % def.title.to_lower(), str(keys.get(type, "")), model.set_tool.bind(type)))
 	list.append(Entry.new("edit.pipette", "Pipette : prendre l'outil de l'élément sous le curseur", "A", model.pipette))
+	list.append(Entry.new("report.next", "Rapport : problème suivant", "", model.go_next_issue))
+	list.append(Entry.new("report.show", "Rapport : afficher ou masquer", "", func() -> void: model.set_report_visible(not model.report_visible)))
 	list.append(Entry.new("symbols.relabel", "Replacer les étiquettes", "", model.relabel))
 	list.append(Entry.new("symbols.unpin", "Libérer les étiquettes fixées à la main", "", model.unpin_labels))
 	list.append(Entry.new("symbols.compact", "Compacter la numérotation", "", model.compact_numbering))
@@ -84,7 +86,7 @@ static func _add_symbol_commands(model: EditorModel, list: Array[Entry]) -> void
 		func() -> void: model.select_filtered(Selectors.custom_texts(model.sheet()), "textes personnalisés")))
 	for slot: int in range(1, Quickbar.SLOTS + 1):
 		list.append(Entry.new("quickbar.set.%d" % slot, "Barre rapide : mémoriser l'outil actuel dans la case %d" % slot, "", model.store_quickbar.bind(slot)))
-	list.append(Entry.new("quickbar.clear", "Barre rapide : vider toutes les cases", "", model.quickbar.clear))
+	list.append(Entry.new("quickbar.clear", "Barre rapide : vider toutes les cases", "", model.clear_quickbar))
 
 
 ## Indices of `entries` matching `query`, best first. An empty query lists everything.

@@ -17,6 +17,9 @@ static func check(catalog: Catalog, section: String, key: String, value: Variant
 		"cartouche":
 			if not (value is String):
 				return "cartouche.%s must be text" % key
+		"acknowledgements":
+			if not (value is bool) or not value:
+				return "acknowledgements.%s must be true" % key
 	return ""
 
 

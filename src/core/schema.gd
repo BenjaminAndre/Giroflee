@@ -96,7 +96,7 @@ const CONFIG_SPEC: Dictionary = {
 const MOVED_TO_CONFIG: PackedStringArray = ["frame_cols", "frame_rows", "title_pos_mm", "ghost_on", "hints"]
 
 ## Document sections without a schema yet (they get one in later milestones).
-const FREE_SECTIONS: PackedStringArray = ["cartouche", "board", "circuits"]
+const FREE_SECTIONS: PackedStringArray = ["cartouche", "board", "circuits", "acknowledgements"]
 
 
 static func has_entity_type(type: String) -> bool:

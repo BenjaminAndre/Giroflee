@@ -15,6 +15,8 @@ signal text_requested(world_pos: Vector2, entity_id: String, initial_text: Strin
 signal rename_requested(sheet_id: String)
 ## Short message for the status bar.
 signal notice(message: String)
+## A quickbar slot was stored or cleared (the window saves the quickbar per user and project).
+signal quickbar_changed
 
 const DEFAULT_DEFAULTS: Dictionary = {
 	"door_width": 900,
@@ -48,6 +50,12 @@ var quickbar: Quickbar = Quickbar.new()
 ## What is selected on the unifilaire: {} or {"kind": "column"|"device"|"head"|"point", "letter", "index", "id"}.
 ## View state like the focus: it never touches the project.
 var uni_selection: Dictionary = {}
+## The report panel: whether it is shown, and the key of the issue the author is looking at.
+var report_visible: bool = true
+var selected_issue_key: String = ""
+
+var _report: Array[Issue] = []
+var _report_revision: int = -1
 ## Style properties copied with "Copier les propriétés" ({} when nothing was copied).
 var settings_clipboard: Dictionary = {}
 var defaults: Dictionary = DEFAULT_DEFAULTS.duplicate()
@@ -251,6 +259,16 @@ func selected_entities() -> Array[Entity]:
 	return out
 
 
+## The entity as it is drawn right now: with the properties of the gesture in progress (a resize, a
+## move) when the tool has any, so boxes and handles follow the pointer instead of the old state.
+func live_entity(entity: Entity) -> Entity:
+	var live: Dictionary = tool.overrides(self)
+	if live.has(entity.id):
+		var props: Dictionary = live[entity.id]
+		return Entity.new(entity.id, entity.type, props)
+	return entity
+
+
 ## Bounding box of the selection in world mm (empty Rect2 when nothing is selected). With
 ## `core`, line thickness is ignored (what the transform box scales and rotates).
 func selection_bounds(core: bool = false) -> Rect2:
@@ -258,7 +276,8 @@ func selection_bounds(core: bool = false) -> Rect2:
 	var first: bool = true
 	var context: RenderContext = ctx()
 	for entity: Entity in selected_entities():
-		var b: Rect2 = EntityGeometry.core_bounds(entity, context) if core else EntityGeometry.bounds(entity, context)
+		var shown: Entity = live_entity(entity)
+		var b: Rect2 = EntityGeometry.core_bounds(shown, context) if core else EntityGeometry.bounds(shown, context)
 		rect = b if first else rect.merge(b)
 		first = false
 	return rect
@@ -442,10 +461,16 @@ func begin_anchor() -> void:
 
 ## Anchors the selected symbols to `parent_id`, keeping every symbol where it is (FR-STACK-1).
 func anchor_selection_to(parent_id: String) -> CommandResult:
+	return anchor_ids_to(selection, parent_id)
+
+
+## Anchors the symbols among `ids` to `parent_id` (Alt + drag, FR-STACK-2).
+func anchor_ids_to(ids: Array, parent_id: String) -> CommandResult:
 	var parent: Entity = sheet().entities[parent_id]
 	var parent_pos: Vector2 = EntityGeometry.vec(parent.props["pos"])
 	var items: Array = []
-	for entity: Entity in selected_entities():
+	for raw_id: Variant in ids:
+		var entity: Entity = sheet().entities[str(raw_id)]
 		if entity.type != "symbol" or entity.id == parent_id:
 			continue
 		var offset: Vector2 = EntityGeometry.vec(entity.props["pos"]) - parent_pos
@@ -455,8 +480,23 @@ func anchor_selection_to(parent_id: String) -> CommandResult:
 
 ## "Détacher": the selected symbols stay in place and stop following a parent.
 func detach_selection() -> void:
+	detach_ids(selection)
+
+
+## Alt + right-click: detaches the symbol under the cursor.
+func detach_at(world: Vector2) -> void:
+	var picked: String = HitTest.pick(sheet(), ctx(), world, tolerance(), focus_excluded(), spatial())
+	if picked.is_empty():
+		return
+	detach_ids([picked])
+
+
+func detach_ids(ids: Array) -> void:
 	var items: Array = []
-	for entity: Entity in selected_entities():
+	for raw_id: Variant in ids:
+		if not sheet().entities.has(str(raw_id)):
+			continue
+		var entity: Entity = sheet().entities[str(raw_id)]
 		var parent: String = entity.props["anchor_parent"] if entity.type == "symbol" else ""
 		if not parent.is_empty():
 			items.append({"id": entity.id, "props": {"anchor_parent": "", "anchor_offset": [0, 0]}})
@@ -479,12 +519,34 @@ func copy_settings() -> void:
 	notice.emit(tr("Propriétés copiées"))
 
 
+## Shift + right-click: copies the settings of the entity under the cursor (FR-EDIT-7).
+func copy_settings_at(world: Vector2) -> void:
+	var picked: String = HitTest.pick(sheet(), ctx(), world, tolerance(), focus_excluded(), spatial())
+	if picked.is_empty():
+		return
+	var source: Entity = sheet().entities[picked]
+	settings_clipboard = StyleProps.capture(source)
+	if settings_clipboard.is_empty():
+		notice.emit(tr("Cet élément n'a pas de propriétés à copier"))
+		return
+	notice.emit(tr("Propriétés copiées"))
+
+
+## Shift + left-click: pastes the copied settings onto one entity.
+func paste_settings_to(entity_id: String) -> void:
+	_paste_settings_on([entity_id])
+
+
 ## "Coller les propriétés": applies them to the selected entities of the same type.
 func paste_settings() -> void:
+	_paste_settings_on(selection)
+
+
+func _paste_settings_on(ids: Array) -> void:
 	if settings_clipboard.is_empty():
 		notice.emit(tr("Aucune propriété copiée"))
 		return
-	var items: Array = StyleProps.items(sheet(), selection, settings_clipboard)
+	var items: Array = StyleProps.items(sheet(), ids, settings_clipboard)
 	if items.is_empty():
 		notice.emit(tr("Rien à modifier dans la sélection"))
 		return
@@ -515,8 +577,15 @@ func store_quickbar(slot: int) -> void:
 		notice.emit(tr("Choisissez d'abord un outil à mémoriser"))
 		return
 	quickbar.assign(slot, preset)
+	quickbar_changed.emit()
 	changed.emit()
 	notice.emit(tr("Case %d mémorisée") % slot)
+
+
+func clear_quickbar() -> void:
+	quickbar.clear()
+	quickbar_changed.emit()
+	changed.emit()
 
 
 ## Digit key: switches to the preset of the slot.
@@ -772,6 +841,88 @@ func move_sheet(sheet_id: String, index: int) -> CommandResult:
 		target = maxi(target, 1)
 	target = clampi(target, 0, doc().sheet_order.size() - 1)
 	return _run("sheet.move", {"id": sheet_id, "index": target})
+
+
+# --- report -------------------------------------------------------------------------------------
+
+
+## The issues of the project, errors first (computed again only when the document changed).
+func issues() -> Array[Issue]:
+	if _report_revision != doc().revision:
+		_report = ReportBuilder.build(doc())
+		_report_revision = doc().revision
+	return _report
+
+
+func issue_for_key(key: String) -> Issue:
+	for issue: Issue in issues():
+		if issue.key == key:
+			return issue
+	return null
+
+
+func selected_issue() -> Issue:
+	return issue_for_key(selected_issue_key)
+
+
+func set_report_visible(shown: bool) -> void:
+	report_visible = shown
+	view_revision += 1
+	changed.emit()
+
+
+## Selects an issue and shows its subject: the étage tab, the symbols or the unifilaire column,
+## centred in the view (SRD FR-RPT-9).
+func goto_issue(issue: Issue) -> void:
+	selected_issue_key = issue.key
+	if not issue.sheet_id.is_empty() and doc().sheets.has(issue.sheet_id):
+		set_active_sheet(issue.sheet_id)
+	if sheet().kind == "plan" and not issue.entity_ids.is_empty():
+		set_selection(issue.entity_ids)
+		var bounds: Rect2 = selection_bounds()
+		view().center = bounds.get_center()
+		view().user_adjusted = true
+	elif sheet().kind == "unifilaire":
+		if not issue.head_id.is_empty():
+			select_uni({"kind": "head", "id": issue.head_id})
+		elif not issue.circuit.is_empty():
+			select_uni({"kind": "column", "letter": issue.circuit})
+		else:
+			select_uni({})
+	view_revision += 1
+	changed.emit()
+
+
+## Tab in the report: the next issue that is not acknowledged after the selected one, wrapping round.
+func go_next_issue() -> void:
+	var list: Array[Issue] = issues()
+	if list.is_empty():
+		notice.emit(tr("Aucun problème dans le rapport"))
+		return
+	var start: int = -1
+	for i: int in list.size():
+		if list[i].key == selected_issue_key:
+			start = i
+	for step: int in range(1, list.size() + 1):
+		var candidate: Issue = list[(start + step) % list.size()]
+		if not candidate.acknowledged:
+			goto_issue(candidate)
+			return
+	notice.emit(tr("Tous les problèmes sont reconnus"))
+
+
+## Enter in the report: acknowledges the selected issue; the next open one is shown.
+func acknowledge_selected_issue() -> void:
+	var issue: Issue = selected_issue()
+	if issue == null:
+		return
+	if _run("doc.set", {"section": "acknowledgements", "key": issue.key, "value": true}).ok:
+		go_next_issue()
+
+
+func unacknowledge_issue(key: String) -> void:
+	if doc().acknowledgements.has(key):
+		_run("doc.unset", {"section": "acknowledgements", "key": key})
 
 
 # --- unifilaire and board -----------------------------------------------------------------------

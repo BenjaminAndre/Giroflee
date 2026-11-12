@@ -8,6 +8,9 @@ extends RefCounted
 
 signal palette_requested
 signal new_window_requested
+signal save_requested
+signal save_as_requested
+signal open_requested
 
 const WHEEL_PAN_PIXELS: float = 60.0
 const WHEEL_ZOOM_STEP: float = 1.15
@@ -17,6 +20,9 @@ var space_down: bool = false
 
 var _panning: bool = false
 var _last_screen: Vector2 = Vector2.ZERO
+## Last pointer position on screen, to refresh previews when only a modifier key changes.
+var _pointer: Vector2 = Vector2.ZERO
+var _has_pointer: bool = false
 
 
 func _init(p_model: EditorModel) -> void:
@@ -44,6 +50,9 @@ func _handle_key(event: InputEventKey) -> bool:
 	if event.keycode == KEY_SPACE:
 		space_down = event.pressed
 		return true
+	if _is_modifier(event):
+		_refresh_for_modifiers(event)
+		return false
 	if not event.pressed:
 		return false
 	# the second key of "C letter" / "X digit"
@@ -111,6 +120,15 @@ func _handle_key(event: InputEventKey) -> bool:
 	return true
 
 
+## Shift, Ctrl or Alt went down or up: previews that depend on them (the Alt-place index, scaling
+## from the centre, the cursor over a handle) are recomputed at once, without waiting for the pointer to move.
+func _refresh_for_modifiers(event: InputEventKey) -> void:
+	if not _has_pointer:
+		return
+	model.tool.move(model, _tool_input(_pointer, event))
+	model.changed.emit()
+
+
 func _start_prefix(prefix: String) -> void:
 	model.pending_prefix = prefix
 	model.changed.emit()
@@ -148,6 +166,10 @@ static func digit_of(event: InputEventKey) -> int:
 
 func _handle_ctrl_key(event: InputEvent) -> bool:
 	var key_event: InputEventKey = event
+	var slot: int = digit_of(key_event)
+	if slot > 0:
+		model.store_quickbar(slot) # FR-QB-3: Ctrl + digit stores the active tool
+		return true
 	match key_event.keycode:
 		KEY_Z:
 			model.undo()
@@ -172,6 +194,13 @@ func _handle_ctrl_key(event: InputEvent) -> bool:
 			model.cycle_sheet(-1 if key_event.shift_pressed else 1)
 		KEY_N:
 			new_window_requested.emit()
+		KEY_S:
+			if key_event.shift_pressed:
+				save_as_requested.emit()
+			else:
+				save_requested.emit()
+		KEY_O:
+			open_requested.emit()
 		KEY_P:
 			palette_requested.emit()
 		_:
@@ -238,6 +267,8 @@ func _handle_button(event: InputEventMouseButton) -> bool:
 			if not event.pressed and _panning:
 				_panning = false
 				return true
+			_pointer = event.position
+			_has_pointer = true
 			var input: ToolInput = _tool_input(event.position, event)
 			input.double_click = event.double_click
 			model.hover = input.world
@@ -248,7 +279,25 @@ func _handle_button(event: InputEventMouseButton) -> bool:
 				model.tool.release(model, input)
 			model.changed.emit()
 			return true
+		MOUSE_BUTTON_RIGHT:
+			return _handle_right_button(event)
 	return false
+
+
+## Shift + right-click copies settings, Alt + right-click detaches a symbol (select tool on a plan).
+func _handle_right_button(event: InputEventMouseButton) -> bool:
+	if not event.pressed or model.tool_name != "select" or model.sheet().kind != "plan":
+		return false
+	var world: Vector2 = model.view().screen_to_world(event.position)
+	model.hover = world
+	if event.shift_pressed:
+		model.copy_settings_at(world)
+	elif event.alt_pressed:
+		model.detach_at(world)
+	else:
+		return false
+	model.changed.emit()
+	return true
 
 
 func _handle_motion(event: InputEventMouseMotion) -> bool:
@@ -257,6 +306,8 @@ func _handle_motion(event: InputEventMouseMotion) -> bool:
 		_last_screen = event.position
 		model.changed.emit()
 		return true
+	_pointer = event.position
+	_has_pointer = true
 	var input: ToolInput = _tool_input(event.position, event)
 	model.hover = input.world
 	model.hover_snap = model.snap(input.world)
