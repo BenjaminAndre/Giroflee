@@ -33,8 +33,10 @@ func press(model: EditorModel, input: ToolInput) -> void:
 		return
 	match region.kind:
 		"point":
-			model.select_uni({"kind": "point", "letter": region.letter, "index": region.index})
-			if not region.symbol_ids.is_empty():
+			if region.symbol_ids.is_empty():
+				model.select_uni({"kind": "point", "letter": region.letter, "index": region.index})
+			else:
+				# a jump: the place we leave is remembered as it is, before anything is selected
 				model.jump_to_symbol(region.symbol_ids[0])
 		"column", "device":
 			model.select_uni({"kind": region.kind, "letter": region.letter, "id": region.id})

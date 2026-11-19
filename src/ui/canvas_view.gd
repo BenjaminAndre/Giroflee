@@ -239,14 +239,23 @@ func _draw_selection(view: ViewTransform) -> void:
 
 ## Affinity-style box: eight resize handles and a rotation handle on a stem above it.
 func _draw_transform_box(view: ViewTransform, box: TransformBox) -> void:
-	var a: Vector2 = view.world_to_screen(Vector2(box.box.position.x, box.box.end.y))
-	var b: Vector2 = view.world_to_screen(Vector2(box.box.end.x, box.box.position.y))
-	draw_rect(Rect2(a, b - a).abs(), SELECTION, false, 1.0)
-	var top_middle: Vector2 = view.world_to_screen(box.handle_pos("n"))
+	# while the rotation handle is dragged the box turns with the selection
+	var angle: float = 0.0
+	var pivot: Vector2 = Vector2.ZERO
+	if model.tool is SelectTool:
+		var select: SelectTool = model.tool
+		angle = deg_to_rad(select.rotation_deg())
+		pivot = select.rotation_pivot()
+	var corners: PackedVector2Array = PackedVector2Array()
+	for corner: Vector2 in [box.box.position, Vector2(box.box.end.x, box.box.position.y), box.box.end, Vector2(box.box.position.x, box.box.end.y)]:
+		corners.append(view.world_to_screen(pivot + (corner - pivot).rotated(angle)))
+	corners.append(corners[0])
+	draw_polyline(corners, SELECTION, 1.0)
+	var top_middle: Vector2 = view.world_to_screen(pivot + (box.handle_pos("n") - pivot).rotated(angle))
 	for handle: Dictionary in box.handles:
 		var id: String = handle["id"]
 		var pos: Vector2 = handle["pos"]
-		var p: Vector2 = view.world_to_screen(pos)
+		var p: Vector2 = view.world_to_screen(pivot + (pos - pivot).rotated(angle))
 		if id == "rotate":
 			draw_line(top_middle, p, SELECTION, 1.0)
 			draw_circle(p, 5.5, Color.WHITE)

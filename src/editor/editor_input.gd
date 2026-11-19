@@ -23,6 +23,8 @@ var _last_screen: Vector2 = Vector2.ZERO
 ## Last pointer position on screen, to refresh previews when only a modifier key changes.
 var _pointer: Vector2 = Vector2.ZERO
 var _has_pointer: bool = false
+## Shift, Ctrl and Alt as last seen, so that only a real change refreshes the preview.
+var _mods: Array[bool] = [false, false, false]
 
 
 func _init(p_model: EditorModel) -> void:
@@ -70,6 +72,12 @@ func _handle_key(event: InputEventKey) -> bool:
 		model.use_quickbar(digit)
 		return true
 	match event.keycode:
+		KEY_BACK:
+			model.jump_back()
+			return true
+		KEY_FORWARD:
+			model.jump_forward()
+			return true
 		KEY_ESCAPE:
 			_escape()
 			return true
@@ -123,9 +131,23 @@ func _handle_key(event: InputEventKey) -> bool:
 ## Shift, Ctrl or Alt went down or up: previews that depend on them (the Alt-place index, scaling
 ## from the centre, the cursor over a handle) are recomputed at once, without waiting for the pointer to move.
 func _refresh_for_modifiers(event: InputEventKey) -> void:
-	if not _has_pointer:
+	if event.echo or not _has_pointer:
 		return
-	model.tool.move(model, _tool_input(_pointer, event))
+	var input: ToolInput = _tool_input(_pointer, event)
+	# the key that was just pressed or released says so itself; the flags of the event are not
+	# reliable for it on every platform
+	match event.keycode:
+		KEY_SHIFT:
+			input.shift = event.pressed
+		KEY_CTRL:
+			input.ctrl = event.pressed
+		KEY_ALT:
+			input.alt = event.pressed
+	var now: Array[bool] = [input.shift, input.ctrl, input.alt]
+	if now == _mods:
+		return
+	_mods = now
+	model.tool.move(model, input)
 	model.changed.emit()
 
 
@@ -271,6 +293,7 @@ func _handle_button(event: InputEventMouseButton) -> bool:
 			_has_pointer = true
 			var input: ToolInput = _tool_input(event.position, event)
 			input.double_click = event.double_click
+			_mods = [input.shift, input.ctrl, input.alt]
 			model.hover = input.world
 			model.hover_snap = model.snap(input.world)
 			if event.pressed:
@@ -281,6 +304,14 @@ func _handle_button(event: InputEventMouseButton) -> bool:
 			return true
 		MOUSE_BUTTON_RIGHT:
 			return _handle_right_button(event)
+		MOUSE_BUTTON_XBUTTON1, MOUSE_BUTTON_XBUTTON2:
+			# the "page back" and "page forward" buttons of the mouse walk through the jump points
+			if event.pressed:
+				if event.button_index == MOUSE_BUTTON_XBUTTON1:
+					model.jump_back()
+				else:
+					model.jump_forward()
+			return true
 	return false
 
 
@@ -309,6 +340,7 @@ func _handle_motion(event: InputEventMouseMotion) -> bool:
 	_pointer = event.position
 	_has_pointer = true
 	var input: ToolInput = _tool_input(event.position, event)
+	_mods = [input.shift, input.ctrl, input.alt]
 	model.hover = input.world
 	model.hover_snap = model.snap(input.world)
 	model.tool.move(model, input)

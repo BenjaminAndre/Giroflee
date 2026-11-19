@@ -64,6 +64,11 @@ func press(world: Vector2, shift: bool = false, double: bool = false, alt: bool 
 	_button(world, MOUSE_BUTTON_LEFT, true, shift, ctrl, alt, double)
 
 
+## The back (1) or forward (2) button of the mouse.
+func side_button(index: int) -> bool:
+	return _button(Vector2.ZERO, MOUSE_BUTTON_XBUTTON1 if index == 1 else MOUSE_BUTTON_XBUTTON2, true, false, false, false, false)
+
+
 ## A right-click (press only, as the editor acts on the press).
 func rclick(world: Vector2, shift: bool = false, alt: bool = false) -> bool:
 	return _button(world, MOUSE_BUTTON_RIGHT, true, shift, false, alt, false)

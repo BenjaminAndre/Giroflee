@@ -162,6 +162,7 @@ The **étage name** is shown automatically as a large dark-red title on the shee
 
 ### 6.1b Previews look final (FR-PREV)
 - **FR-PREV-1** While a wall, block, opening or stair is being drawn, the preview is **drawn exactly as the finished object will be**: same colour, line weight, mitred joins and fill, not a tinted or translucent outline. A wall shows up as a wall from its first segment on (author feedback: the blue preview was confusing). Only a live length readout and the snap marker are extra, and both are visually neutral (not wall-coloured).
+- **FR-JUMP-1** **Jump points, like Vim's jump list.** Jumping registers where you were (étage, view, selection): clicking a point of the unifilaire (which shows its symbol on the plan), going to a report issue and changing tab (click or Ctrl+Tab) are jumps. The mouse **back** button (and the browser Back key) returns to the previous jump point, **forward** goes on again; a new jump forgets what was ahead; a jump point whose étage was deleted is skipped. The list holds the last 100 and is view state (not saved).
 - **FR-PREV-5** Everything that depends on the pointer or on a modifier key is redrawn **live**: previews and the transform box follow a gesture while it runs (the box is drawn around the entity as it will be, not as it was), and pressing or releasing `Shift`, `Ctrl` or `Alt` updates the preview at once (the Alt-place label, scaling from the centre, free-angle walls) without the pointer having to move.
 - **FR-PREV-2** The preview is computed by the same code as the final drawing (`EntityGeometry.add_ops`), so the two cannot differ.
 
@@ -187,7 +188,7 @@ Resizing and rotating work **like in Affinity**, with handles around the selecti
 - **FR-SYM-6** `count` is editable in the Properties panel and by shortcut: `X` then a digit (e.g. `X` `3`).
 - **FR-SYM-7** Changing a symbol's circuit: select (click or box), then `C` + letter (e.g. `C` `H`). With nothing selected, `C` + letter sets the **active circuit**. Reassigned symbols take the next free index in the new circuit (links inside the moved selection are preserved).
 - **FR-SYM-8** Renumbering: palette command **"Compacter la numérotation"** removes gaps in a circuit's indices (or all circuits). No default key. Deleting never renumbers automatically (stable indices).
-- **FR-SYM-9** **Pipette** (`A`, like Factorio's Q): over an entity, switches to the tool for that entity type, with its properties (symbol type, flip, rotation, count; opening/stair parameters; wall weight) and, for an electric symbol, the **active circuit** set to its circuit. Alt-placing right after reuses that symbol's index. Circuit-focused-out items (FR-FOCUS-1) are not picked.
+- **FR-SYM-9** **Pipette** (`A`, like Factorio's Q): over an entity, switches to the tool for that entity type, with its properties (symbol type, flip, rotation, count; opening/stair parameters; wall weight) and, for an electric symbol, nothing about circuits: **the pipette never changes the active circuit** (decided), which stays under the author's control with `C` + letter. Alt-placing right after reuses the pipetted symbol's index only when it is in the active circuit. Circuit-focused-out items (FR-FOCUS-1) are not picked.
 
 ### 6.3 Stacks (FR-STACK)
 Real walls often hold a vertical stack at one spot: a socket near the floor, a switch at waist height, a lamp at head height. On a plan these are drawn side by side.
@@ -266,6 +267,7 @@ Vim-like: a **Normal** mode (select) and tool states. `Esc` always returns to Se
 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | Next / previous tab |
 | `Ctrl+P` | Command palette (fuzzy search) |
 | `Ctrl+S` / `Ctrl+Shift+S` / `Ctrl+O` | Save / save as / open (decided; `Ctrl+Shift+S` is the usual companion of `Ctrl+S`) |
+| Mouse "back" / "forward" buttons (also the browser Back / Forward keys) | Jump back / forward through the jump points (FR-JUMP-1) |
 | `Ctrl+E` | Export, **reserved**: to be linked when the export exists (M6) |
 | `Ctrl+Z` / `Ctrl+Y` | Undo / redo |
 | `Ctrl+C/X/V`, `Ctrl+D` | Copy / cut / paste, duplicate selection |

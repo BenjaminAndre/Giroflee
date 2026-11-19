@@ -470,14 +470,14 @@ func _on_tab_changed(index: int) -> void:
 		return
 	var plans: Array[String] = model.doc().plan_ids()
 	if index >= 0 and index < plans.size():
-		model.set_active_sheet(plans[index])
+		model.switch_sheet(plans[index])
 		canvas.grab_focus()
 
 
 func _on_unifilaire_pressed() -> void:
 	var uni: Sheet = model.doc().unifilaire_sheet()
 	if uni != null:
-		model.set_active_sheet(uni.id)
+		model.switch_sheet(uni.id)
 		_sync_tabs()
 		canvas.grab_focus()
 

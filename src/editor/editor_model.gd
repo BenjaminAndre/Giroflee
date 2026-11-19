@@ -54,6 +54,11 @@ var uni_selection: Dictionary = {}
 var report_visible: bool = true
 var selected_issue_key: String = ""
 
+## Jump points, like Vim's jump list: where the author was before a jump (a click on a point of the
+## unifilaire, a report issue). Back and forward walk through them (SRD FR-JUMP-1).
+var _jumps_back: Array[Dictionary] = []
+var _jumps_forward: Array[Dictionary] = []
+
 var _report: Array[Issue] = []
 var _report_revision: int = -1
 ## Style properties copied with "Copier les propriétés" ({} when nothing was copied).
@@ -383,10 +388,8 @@ func pipette() -> String:
 			place_flip_v = props["flip_v"]
 			place_count = props["count"]
 			place_rotation_manual = true
-			var circuit: String = props["circuit"]
-			if not circuit.is_empty():
-				active_circuit = circuit
-				note_placed(props)
+			# the pipette never touches the active circuit (it stays under the author's control with C)
+			note_placed(props)
 		"opening":
 			var kind: String = props["kind"]
 			defaults["%s_width" % kind] = props["width_mm"]
@@ -814,7 +817,15 @@ func cycle_sheet(step: int) -> void:
 	if order.size() < 2:
 		return
 	var index: int = order.find(active_sheet_id)
-	set_active_sheet(order[posmod(index + step, order.size())])
+	switch_sheet(order[posmod(index + step, order.size())])
+
+
+## The author moves to another tab (click, Ctrl+Tab): the place left is a jump point (FR-JUMP-1).
+func switch_sheet(sheet_id: String) -> void:
+	if sheet_id == active_sheet_id or not doc().sheets.has(sheet_id):
+		return
+	register_jump()
+	set_active_sheet(sheet_id)
 
 
 ## New étage after the active one; it inherits paper, scale, grid and frame settings.
@@ -874,6 +885,8 @@ func set_report_visible(shown: bool) -> void:
 ## Selects an issue and shows its subject: the étage tab, the symbols or the unifilaire column,
 ## centred in the view (SRD FR-RPT-9).
 func goto_issue(issue: Issue) -> void:
+	if issue.key != selected_issue_key:
+		register_jump()
 	selected_issue_key = issue.key
 	if not issue.sheet_id.is_empty() and doc().sheets.has(issue.sheet_id):
 		set_active_sheet(issue.sheet_id)
@@ -1089,11 +1102,77 @@ func set_cartouche_field(key: String, value: String) -> CommandResult:
 	return _run("doc.set", {"section": "cartouche", "key": key, "value": value})
 
 
+# --- jump points ---------------------------------------------------------------------------------
+
+const MAX_JUMPS: int = 100
+
+
+## Where the author is now: the étage, the view, the selection.
+func _place() -> Dictionary:
+	return {
+		"sheet": active_sheet_id, "center": view().center, "zoom": view().zoom,
+		"selection": selection.duplicate(), "uni": uni_selection.duplicate(),
+	}
+
+
+## Remembers the current place before a jump; a new jump forgets the forward list, as in Vim.
+func register_jump() -> void:
+	_jumps_back.append(_place())
+	if _jumps_back.size() > MAX_JUMPS:
+		_jumps_back.pop_front()
+	_jumps_forward.clear()
+
+
+func can_jump_back() -> bool:
+	return not _jumps_back.is_empty()
+
+
+func can_jump_forward() -> bool:
+	return not _jumps_forward.is_empty()
+
+
+## Back to the previous jump point (the "page back" button of the mouse).
+func jump_back() -> void:
+	_walk(_jumps_back, _jumps_forward)
+
+
+## Forward again after going back.
+func jump_forward() -> void:
+	_walk(_jumps_forward, _jumps_back)
+
+
+func _walk(from: Array[Dictionary], to: Array[Dictionary]) -> void:
+	while not from.is_empty():
+		var target: Dictionary = from.pop_back()
+		var sheet_id: String = target["sheet"]
+		if not doc().sheets.has(sheet_id):
+			continue # the étage was deleted since
+		to.append(_place())
+		_restore(target)
+		return
+	notice.emit(tr("Pas d'autre point de saut"))
+
+
+func _restore(place: Dictionary) -> void:
+	var sheet_id: String = place["sheet"]
+	set_active_sheet(sheet_id)
+	var saved_center: Vector2 = place["center"]
+	var saved_zoom: float = place["zoom"]
+	view().center = saved_center
+	view().zoom = saved_zoom
+	view().user_adjusted = true
+	var saved_selection: Array = place["selection"]
+	set_selection(saved_selection)
+	var saved_uni: Dictionary = place["uni"]
+	select_uni(saved_uni)
+
+
 ## Click on a point of the unifilaire: shows its first symbol on its plan (FR-UNI-7).
 func jump_to_symbol(symbol_id: String) -> void:
 	var sheet_id: String = doc().sheet_id_of_entity(symbol_id)
 	if sheet_id.is_empty():
 		return
+	register_jump()
 	set_active_sheet(sheet_id)
 	set_selection([symbol_id])
 

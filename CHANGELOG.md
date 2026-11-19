@@ -32,6 +32,9 @@ Versions are `vMAJOR.MINOR.PATCH`: `MAJOR.MINOR` come from the `VERSION` file, `
 - Tests: 735 in total.
 - **Answers of the author applied**: the quickbar is saved per user and per project (in the user's preferences, under the project file); `Ctrl+S`, `Ctrl+Shift+S` and `Ctrl+O` save, save as and open (`Ctrl+E` is kept for the export); a box selects only what is fully inside it; the transform box now follows a resize or a move while it runs instead of staying behind, and pressing or releasing Shift, Ctrl or Alt updates previews at once (the Alt-place label) without moving the mouse. The pending decisions that were answered are cleared from SRD section 18.
 - Tests: 752 in total.
+- **Jump points** (SRD FR-JUMP-1): clicking a point of the unifilaire , going to a report issue or changing tab remembers where you were; the mouse back and forward buttons (and the browser Back / Forward keys) walk through the jump points like Vim's jump list, restoring the étage, the view and the selection.
+- **Fixes**: the transform box now turns with the selection while the rotation handle is dragged (it kept resizing to the turned shapes' bounds); Alt, Shift and Ctrl refresh the preview from the key's own state, once per change and not on key repeat; the pipette no longer changes the active circuit (decided: it only takes the tool and its settings).
+- Tests: 763 in total.
 - **Gestures decided with the author, Factorio-inspired**: `Ctrl+digit` stores the active tool in a quickbar slot (a plain digit only uses it); `Shift` + right-click copies the settings of an entity and `Shift` + left-click pastes them onto one; `Alt` + drag a symbol onto another anchors it, `Alt` + right-click detaches; selection toggling and additive box selection move from `Shift` to `Ctrl`.
 
 ### Fixed

@@ -23,6 +23,7 @@ var _t_grab: Vector2 = Vector2.ZERO
 var _t_entities: Array[Entity] = []
 var _t_followers: Array = []
 var _t_props: Dictionary = {}
+var _t_angle: float = 0.0
 # label drag
 var _label_key: String = ""
 var _label_grab: Vector2 = Vector2.ZERO
@@ -59,7 +60,26 @@ static func handles_for(model: EditorModel) -> Array[Dictionary]:
 static func box_for(model: EditorModel) -> TransformBox:
 	if model.selection.is_empty():
 		return null
+	if model.tool is SelectTool:
+		var select: SelectTool = model.tool
+		if select.is_rotating():
+			# while turning, the box is the original one, drawn turned (see `rotation_deg`)
+			return TransformBox.make(select._t_original, model.view().zoom)
 	return TransformBox.make(model.selection_bounds(true), model.view().zoom)
+
+
+## True while the rotation handle is being dragged.
+func is_rotating() -> bool:
+	return _mode == Mode.TRANSFORM and _t_handle == "rotate"
+
+
+## Angle (degrees, counter-clockwise) the box has been turned by, and the point it turns about.
+func rotation_deg() -> float:
+	return _t_angle if is_rotating() else 0.0
+
+
+func rotation_pivot() -> Vector2:
+	return _t_original.get_center()
 
 
 func press(model: EditorModel, input: ToolInput) -> void:
@@ -373,6 +393,7 @@ func _update_transform(model: EditorModel, input: ToolInput) -> void:
 	if _t_handle == "rotate":
 		var pivot: Vector2 = _t_original.get_center()
 		var angle: float = TransformBox.drag_rotation(pivot, _t_grab, input.world, input.shift)
+		_t_angle = angle
 		_t_props = SelectionTransform.rotate(_t_entities, pivot, angle)
 		return
 	# snap the point that the dragged handle stands for, then keep the grab offset
@@ -388,6 +409,7 @@ func _update_transform(model: EditorModel, input: ToolInput) -> void:
 
 
 func _clear_transform() -> void:
+	_t_angle = 0.0
 	_t_handle = ""
 	_t_entities = []
 	_t_followers = []

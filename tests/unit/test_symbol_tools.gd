@@ -185,6 +185,7 @@ func test_a_socket_far_from_any_wall_keeps_the_placement_rotation() -> void:
 
 func test_the_pipette_copies_a_symbol_into_its_tool_and_alt_links_to_it() -> void:
 	kit.add("symbol", {"symbol_type": "socket", "pos": [3000, 3000], "circuit": "D", "index": 4, "count": 2, "rotation": 90.0, "flip_h": true}, "src")
+	kit.model.active_circuit = "D"
 	kit.move(Vector2(3000, 3000))
 	kit.key(KEY_A)
 	assert_eq(kit.model.tool_name, "socket")
@@ -194,7 +195,7 @@ func test_the_pipette_copies_a_symbol_into_its_tool_and_alt_links_to_it() -> voi
 	assert_true(kit.model.place_flip_h)
 	_place(Vector2(6000, 3000), true)
 	assert_eq(_last().props["circuit"], "D")
-	assert_eq(_last().props["index"], 4, "Alt right after the pipette reuses its index")
+	assert_eq(_last().props["index"], 4, "Alt right after the pipette reuses its index (same circuit)")
 	assert_eq(_last().props["rotation"], 90.0, "the pipetted rotation sticks")
 
 
